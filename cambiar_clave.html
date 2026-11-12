@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <script src="tema-inicial.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#7c2d12">
+  <title>Cambiar contraseña · Liceo Brayan Jr. Mojica Severino</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="comun.js"></script>
+  <script src="rol-activo.js"></script>
+  <link rel="stylesheet" href="acceso.css">
+</head>
+<body class="es-acceso">
+  <a class="saltar" href="#clave1">Saltar al formulario</a>
+  <div class="fondo" aria-hidden="true">
+    <span class="orbita o1"></span>
+    <span class="orbita o2"></span>
+    <span class="orbita o3"></span>
+    <svg viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+      <g fill="none" stroke="#7c2d12" stroke-width="1.2">
+        <circle cx="180" cy="160" r="70"/>
+        <circle cx="180" cy="160" r="110"/>
+        <polygon points="980,80 1060,140 1040,230 920,230 900,140"/>
+        <polygon points="1040,160 1100,210 1020,250"/>
+        <rect x="140" y="560" width="140" height="140" rx="8" transform="rotate(18 210 630)"/>
+        <path d="M700 620 l80 -40 l80 40 v90 h-160z"/>
+        <circle cx="640" cy="120" r="8"/>
+        <circle cx="720" cy="200" r="5"/>
+        <circle cx="400" cy="700" r="6"/>
+      </g>
+    </svg>
+  </div>
+
+  <header class="cabecera-clasica solo-clasico">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20.2h18"/><path d="M4.6 20.2V10.6L12 4.8l7.4 5.8v9.6"/><path d="M9.4 20.2v-4.6h5.2v4.6"/><path d="M12 4.8V3.2"/></svg>
+    <span data-liceo-nombre>Liceo Brayan Jr. Mojica Severino</span>
+  </header>
+  <main class="escena">
+    <div class="tarjeta">
+      <div class="logo">
+        <svg width="48" height="48" viewBox="0 0 48 48" role="img" aria-label="Emblema del liceo">
+          <rect width="48" height="48" rx="14" fill="#7c2d12"/>
+          <path d="M10 31 V22 L24 14 L38 22 V31 H10Z" fill="#fffaf3"/>
+          <rect x="16" y="25" width="6" height="6" fill="#7c2d12"/>
+          <rect x="26" y="25" width="6" height="6" fill="#7c2d12"/>
+          <path d="M22 31 V27 H26 V31" fill="#7c2d12"/>
+          <rect x="22" y="10" width="4" height="6" fill="#fde68a"/>
+        </svg>
+        <div>
+          <strong data-liceo-nombre>Liceo Brayan Jr. Mojica Severino</strong>
+          <span>Plataforma académica</span>
+        </div>
+      </div>
+
+      <form id="vista-clave" class="activa" action="#" method="post" novalidate>
+        <h1>Elige tu contraseña</h1>
+        <p class="intro" id="intro">Cargando...</p>
+        <div class="campo">
+          <label for="clave1">Nueva contraseña</label>
+          <div class="clave-caja">
+            <input type="password" id="clave1" autocomplete="new-password" placeholder="Mínimo 8 caracteres" aria-describedby="reglaClave">
+            <button type="button" class="ver-clave sin-tema" data-clave="clave1" aria-controls="clave1" aria-pressed="false" aria-label="Mostrar contraseña">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="campo">
+          <label for="clave2">Repite la nueva contraseña</label>
+          <input type="password" id="clave2" autocomplete="new-password" placeholder="Escríbela otra vez">
+        </div>
+        <p class="ayuda" id="reglaClave" style="margin:0 0 14px">Debe tener al menos 8 caracteres, con una letra y un número.</p>
+        <button type="submit" class="btn sin-tema" id="btn">Guardar contraseña</button>
+        <button type="button" class="btn secundario sin-tema" id="btnVolver" hidden>Volver</button>
+        <p class="estado" id="estado" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+  </main>
+
+<script>
+    const cliente = App.cliente, $ = id => document.getElementById(id);
+    let ctx, obligatorio = false;
+    function msg(texto, tipo) {
+      const e = $('estado');
+      e.textContent = texto || '';
+      e.className = 'estado' + (tipo ? ' ' + tipo : '');
+      e.setAttribute('role', tipo === 'error' ? 'alert' : 'status');
+    }
+    document.querySelectorAll('.ver-clave').forEach(btn => btn.addEventListener('click', () => {
+      const campo = $(btn.dataset.clave);
+      const ver = campo.type === 'password';
+      campo.type = ver ? 'text' : 'password';
+      btn.setAttribute('aria-pressed', ver ? 'true' : 'false');
+      btn.setAttribute('aria-label', ver ? 'Ocultar contraseña' : 'Mostrar contraseña');
+    }));
+    ['clave1', 'clave2'].forEach(id => $(id).addEventListener('input', () => $(id).removeAttribute('aria-invalid')));
+
+    // v3: vuelve al inicio del rol activo; si hay varios roles sin elegir, a elegir en index.html
+    function destinoTrasClave() {
+      const roles = (ctx && ctx.roles) || [];
+      const activo = window.RolActivo ? RolActivo.obtener(roles) : '';
+      if (activo) return RolActivo.rutas()[activo];
+      const validos = window.RolActivo ? RolActivo.filtrarRoles(roles) : roles;
+      if (validos.length === 1) return App.RUTAS[validos[0]] || 'index.html';
+      return 'index.html';
+    }
+
+    async function iniciar() {
+      ctx = await App.cargarPerfil();
+      if (!ctx || !ctx.perfil) { location.href = 'index.html'; return; }
+      obligatorio = !!ctx.perfil.cambiar_clave;
+      $('intro').textContent = obligatorio
+        ? 'Hola, ' + ctx.perfil.nombre + '. Por seguridad, crea tu propia contraseña antes de continuar.'
+        : 'Elige una contraseña nueva para tu cuenta.';
+      if (!obligatorio) {
+        $('btnVolver').hidden = false;
+        $('btnVolver').onclick = () => location.href = destinoTrasClave();
+      }
+      $('vista-clave').addEventListener('submit', guardar);
+    }
+
+    async function guardar(ev) {
+      if (ev) ev.preventDefault();
+      const c1 = $('clave1'), c2 = $('clave2');
+      const a = c1.value, b = c2.value;
+      if (a.length < 8) { c1.setAttribute('aria-invalid', 'true'); msg('La contraseña debe tener al menos 8 caracteres.', 'error'); c1.focus(); return; }
+      if (!/[A-Za-z]/.test(a) || !/\d/.test(a)) { c1.setAttribute('aria-invalid', 'true'); msg('Usa al menos una letra y un número.', 'error'); c1.focus(); return; }
+      if (a !== b) { c2.setAttribute('aria-invalid', 'true'); msg('Las contraseñas no coinciden. Escríbelas otra vez.', 'error'); c2.focus(); return; }
+      $('btn').disabled = true; msg('Guardando...', 'info');
+      const r = await cliente.auth.updateUser({ password: a });
+      if (r.error) {
+        msg(/same|different/i.test(r.error.message) ? 'Elige una contraseña distinta a la actual.' : 'No se pudo cambiar: ' + r.error.message, 'error');
+        $('btn').disabled = false; return;
+      }
+      const m = await cliente.rpc('marcar_clave_cambiada');
+      if (m.error) { msg('La contraseña se cambió, pero no se pudo registrar: ' + m.error.message, 'error'); $('btn').disabled = false; return; }
+      msg('Contraseña cambiada ✔', 'ok');
+      setTimeout(() => { location.href = destinoTrasClave(); }, 900);
+    }
+
+    iniciar();
+  </script>
+  <script src="tema.js"></script>
+</body>
+</html>

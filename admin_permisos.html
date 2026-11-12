@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <script src="tema-inicial.js"></script>
+  <script src="listado-alumnos.js" defer></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Permisos de alumnos - Administración</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: var(--tp-fondo, #f6efe4); margin: 0; padding: 20px; }
+    .caja { background: white; padding: 20px; border-radius: 12px; max-width: 1000px;
+            margin: 0 auto 16px; box-shadow: 0 6px 20px rgba(124, 45, 18,0.12);
+            border-top: 5px solid var(--tp-principal, #7c2d12); border-left: 6px solid var(--tp-principal, #7c2d12); box-sizing: border-box; }
+    h1, h2, h3 { color: var(--tp-principal, #7c2d12); margin-top: 0; }
+    select, input, button { padding: 8px; margin: 4px; border-radius: 6px; border: 1px solid #ccc;
+                            font-family: Arial, sans-serif; font-size: 14px; box-sizing: border-box; }
+    button { background: var(--tp-principal, #7c2d12); color: white; border: none; cursor: pointer; padding: 10px 16px; }
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.4; cursor: default; }
+    button.sec { background: #e2e8f0; color: #1e293b; }
+    button.mini { padding: 2px 8px; font-size: 11px; margin: 1px; }
+    button.peligro { background: #dc2626; }
+    .barra { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .chip { display: inline-block; background: var(--tp-suave, #fbf3e8); color: var(--tp-principal, #7c2d12); border: 1px solid var(--tp-borde, #e0c49a);
+            border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: bold;
+            text-transform: uppercase; letter-spacing: 0.06em; }
+    .desliza { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ddd; padding: 6px; font-size: 13px; text-align: center; }
+    th { background: var(--tp-principal, #7c2d12); color: white; vertical-align: top; }
+    td.izq, th.izq { text-align: left; }
+    td input[type=checkbox] { width: 18px; height: 18px; margin: 0; cursor: pointer; }
+    tr.restr td { background: #fef2f2; }
+    tr.restr td.izq { border-left: 4px solid #dc2626; }
+    .peq { color: #475569; font-size: 13px; }
+    .aviso { padding: 10px 14px; border-radius: 8px; margin: 10px 0; font-size: 14px;
+             background: #fef9c3; color: #854d0e; border: 1px solid #fde68a; }
+    #estado, #estadoTodos { font-size: 14px; }
+  </style>
+  <link rel="stylesheet" href="diseno.css">
+</head>
+<body>
+
+  <div class="caja">
+    <div class="barra">
+      <div>
+        <span class="chip">Administración</span>
+        <h1>Permisos de los alumnos</h1>
+        <p id="saludo">Cargando...</p>
+      </div>
+      <div>
+        <button class="sec" onclick="location.href='admin.html'">← Volver</button>
+        <button onclick="salir()">Cerrar sesión</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="caja">
+    <h2>Elegir curso</h2>
+    <label><b>Curso:</b> <select id="curso" onchange="cargarCurso()"></select></label>
+    <div class="listado-descarga">
+      <button type="button" class="btn-listado sin-tema" id="btnDescargarListado" onclick="descargarListadoAlumnos()" aria-describedby="ayudaListado"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42l3.3 3.3V4a1 1 0 0 1 1-1zM5 19h14a1 1 0 1 1 0 2H5a1 1 0 1 1 0-2z"/></svg> Descargar listado de alumnos</button>
+      <p class="peq ayuda-listado" id="ayudaListado">Baja un archivo para Excel (CSV) con: No., matrícula, apellidos, nombres y curso. No incluye los permisos. Esta pantalla no carga la matrícula, así que esa columna sale vacía. Tiene datos personales: guárdalo con cuidado.</p>
+      <p class="estado-listado" id="estadoListado" role="status" aria-live="polite"></p>
+    </div>
+    <p class="peq">Marcado = el alumno <b>puede</b> hacerlo. Desmarcado = se le quita. Los cambios afectan al alumno
+      y al padre o tutor conectado a ese alumno. Un alumno sin cambios puede hacer todo.</p>
+  </div>
+
+  <div class="caja">
+    <h2>Permisos por alumno</h2>
+    <div class="desliza">
+      <table>
+        <thead id="cabeza"></thead>
+        <tbody id="filas"></tbody>
+      </table>
+    </div>
+    <button id="btnGuardar" onclick="guardar()">Guardar permisos de este curso</button>
+    <span id="estado"></span>
+    <div class="aviso">Sobre <b>Descargar boletín</b>: se oculta el botón y se bloquea la impresión en la página, pero
+      si el alumno puede <b>ver</b> sus notas, nada impide que las copie a mano o saque una captura. Para que no vea
+      nada, quita también <b>Ver notas</b>; ese sí lo hace cumplir el servidor.</div>
+  </div>
+
+  <div class="caja">
+    <h2>Cambio rápido para todo el liceo</h2>
+    <label>Permiso:
+      <select id="permTodos"></select></label>
+    <label>Acción:
+      <select id="valorTodos">
+        <option value="false">Quitar a todos los alumnos</option>
+        <option value="true">Devolver a todos los alumnos</option>
+      </select></label>
+    <button class="peligro" id="btnTodos" onclick="aplicarATodos()">Aplicar a todo el liceo</button>
+    <span id="estadoTodos"></span>
+    <p class="peq">Afecta a todos los cursos a la vez. Los alumnos que se matriculen después no quedan incluidos.</p>
+  </div>
+
+    <script src="rol-activo.js"></script>
+    <script src="diseno.js"></script>
+  <script>Diseno.montar({grupo:"admin", pagina:"admin_permisos.html"});</script>
+<script>
+    const SUPABASE_URL = 'https://twhdnaiwxpilrevngxkk.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_lEIcvZOVtVD9HIK8HFwRtg_ik68D5Ad';
+    const cliente = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const PERMISOS = [
+      ['ver_notas', 'Ver notas'],
+      ['descargar_notas', 'Descargar boletín'],
+      ['ver_tareas', 'Ver tareas'],
+      ['entregar_tareas', 'Entregar tareas'],
+      ['comentar', 'Comentar'],
+      ['ver_asistencia', 'Ver asistencia']
+    ];
+    // Si se quita el permiso principal, los que dependen de él también se quitan
+    const DEPENDEN = { ver_notas: ['descargar_notas'], ver_tareas: ['entregar_tareas', 'comentar'] };
+
+    let alumnos = [];
+    let listadoAlumnos = [];   // v4.1.1: alumnos del curso, tal como llegaron (para «Descargar listado»)
+
+    function esc(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    function estado(msg, color) {
+      const e = document.getElementById('estado');
+      e.style.color = color || '#334155'; e.textContent = msg || '';
+    }
+    function estadoTodos(msg, color) {
+      const e = document.getElementById('estadoTodos');
+      e.style.color = color || '#334155'; e.textContent = msg || '';
+    }
+    async function traerTodo(construir) {
+      let todo = [], desde = 0;
+      const paso = 1000;
+      while (true) {
+        const { data, error } = await construir().range(desde, desde + paso - 1);
+        if (error) throw error;
+        todo = todo.concat(data || []);
+        if (!data || data.length < paso) break;
+        desde += paso;
+      }
+      return todo;
+    }
+
+    async function iniciar() {
+      const { data: { session } } = await cliente.auth.getSession();
+      if (!session) { location.href = 'index.html'; return; }
+      const { data: perfil } = await cliente.from('perfiles')
+        .select('nombre, apellido, rol').eq('id', session.user.id).single();
+      const _ex = await cliente.from('roles_adicionales').select('rol').eq('perfil_id', session.user.id);
+      const _roles = perfil ? [perfil.rol].concat((_ex.data || []).map(x => x.rol)) : [];
+      if (!perfil || (!_roles.includes('admin') && !_roles.includes('coordinador'))) {
+        // v3: sin alerta; vuelve al inicio del rol activo (o a elegir rol)
+        if (perfil && window.RolActivo && RolActivo.alInicio(_roles)) return;
+        alert('Esta página es solo para administración');
+        location.href = 'index.html'; return;
+      }
+      const visual = window.RolActivo
+        ? RolActivo.preparar({ perfil: perfil, roles: _roles }, 'admin_permisos.html')
+        : null;
+      if (window.RolActivo && !visual) return;
+      const rolVista = visual ? visual.rol : (!_roles.includes('admin') ? 'coordinador' : 'admin');
+      document.getElementById('saludo').textContent = ((visual && visual.etiqueta) || (rolVista === 'admin' ? 'Administrador(a)' : 'Coordinador(a)')) + ': ' + perfil.nombre + ' ' + perfil.apellido;
+      if (visual) RolActivo.aplicarDiseno(visual, session.user.id);
+
+      const sp = document.getElementById('permTodos');
+      PERMISOS.forEach(([k, n]) => sp.add(new Option(n, k)));
+
+      const { data } = await cliente.from('cursos').select('id, grado, seccion').order('grado').order('seccion');
+      const sel = document.getElementById('curso');
+      if (!data || !data.length) { sel.add(new Option('No hay cursos', '')); return; }
+      data.forEach(c => sel.add(new Option(c.grado + ' ' + c.seccion, c.id)));
+      cargarCurso();
+    }
+
+    async function cargarCurso() {
+      const cursoId = Number(document.getElementById('curso').value);
+      if (!cursoId) return;
+      estado('Cargando...');
+      const { data: est, error } = await cliente.from('estudiantes')
+        .select('id, nombre, apellido, orden').eq('curso_id', cursoId)
+        .order('orden', { nullsFirst: false }).order('apellido');
+      if (error) { estado('Error: ' + error.message, 'red'); return; }
+      const lista = est || [];
+      listadoAlumnos = lista;   // v4.1.1
+      let perms = [];
+      if (lista.length) {
+        const r = await cliente.from('permisos_estudiante').select('*').in('estudiante_id', lista.map(a => a.id));
+        if (r.error) {
+          estado('No se pudieron leer los permisos: ' + r.error.message + '. Si sigue pasando, avisa a la administración de la plataforma.', 'red');
+          return;
+        }
+        perms = r.data || [];
+      }
+      alumnos = lista.map(a => {
+        const p = perms.find(x => x.estudiante_id === a.id) || {};
+        const fila = { id: a.id, nombre: a.apellido + ', ' + a.nombre };
+        PERMISOS.forEach(([k]) => fila[k] = p[k] === undefined ? true : !!p[k]);
+        return fila;
+      });
+      dibujar();
+      estado('');
+    }
+
+    function dibujar() {
+      document.getElementById('cabeza').innerHTML = '<tr><th class="izq">Alumno</th>' +
+        PERMISOS.map(([k, n]) => '<th>' + n + '<br>' +
+          '<button class="sec mini" onclick="columna(\'' + k + '\', true)">todos</button>' +
+          '<button class="sec mini" onclick="columna(\'' + k + '\', false)">ninguno</button></th>').join('') + '</tr>';
+      document.getElementById('filas').innerHTML = alumnos.length
+        ? alumnos.map((a, i) => filaHTML(a, i)).join('')
+        : '<tr><td colspan="' + (PERMISOS.length + 1) + '">Este curso no tiene alumnos</td></tr>';
+      document.getElementById('btnGuardar').disabled = !alumnos.length;
+    }
+
+    function filaHTML(a, i) {
+      const restr = PERMISOS.some(([k]) => !a[k]);
+      return '<tr id="f' + i + '" class="' + (restr ? 'restr' : '') + '"><td class="izq">' + esc(a.nombre) + '</td>' +
+        PERMISOS.map(([k]) => '<td><input type="checkbox" ' + (a[k] ? 'checked' : '') +
+          ' onchange="cambiar(' + i + ', \'' + k + '\', this.checked)"></td>').join('') + '</tr>';
+    }
+
+    function redibujarFila(i) {
+      const tr = document.getElementById('f' + i);
+      if (tr) tr.outerHTML = filaHTML(alumnos[i], i);
+    }
+
+    function aplicarValor(a, k, valor) {
+      a[k] = valor;
+      if (!valor) (DEPENDEN[k] || []).forEach(h => a[h] = false);
+    }
+    function cambiar(i, k, valor) {
+      aplicarValor(alumnos[i], k, valor);
+      redibujarFila(i);
+    }
+    function columna(k, valor) {
+      alumnos.forEach((a, i) => { aplicarValor(a, k, valor); redibujarFila(i); });
+    }
+
+    function filaBD(a) {
+      const f = { estudiante_id: a.id };
+      PERMISOS.forEach(([k]) => f[k] = !!a[k]);
+      return f;
+    }
+
+    async function guardar() {
+      if (!alumnos.length) return;
+      const btn = document.getElementById('btnGuardar');
+      btn.disabled = true;
+      estado('Guardando...');
+      const { error } = await cliente.from('permisos_estudiante')
+        .upsert(alumnos.map(filaBD), { onConflict: 'estudiante_id' });
+      btn.disabled = false;
+      if (error) {
+        estado('No se pudo guardar: ' + (error.message.includes('row-level security')
+          ? 'solo la administración puede cambiar permisos.' : error.message), 'red');
+        return;
+      }
+      const restringidos = alumnos.filter(a => PERMISOS.some(([k]) => !a[k])).length;
+      estado('Permisos guardados ✔ (' + restringidos + ' alumno(s) con restricciones)', 'green');
+    }
+
+    async function aplicarATodos() {
+      const permiso = document.getElementById('permTodos').value;
+      const valor = document.getElementById('valorTodos').value === 'true';
+      const nombre = PERMISOS.find(p => p[0] === permiso)[1];
+      if (!confirm((valor ? 'Devolver' : 'Quitar') + ' "' + nombre + '" a TODOS los alumnos del liceo. ¿Continuar?')) return;
+      const btn = document.getElementById('btnTodos');
+      btn.disabled = true;
+      estadoTodos('Aplicando...');
+      try {
+        const [ests, perms] = await Promise.all([
+          traerTodo(() => cliente.from('estudiantes').select('id').order('id')),
+          traerTodo(() => cliente.from('permisos_estudiante').select('*').order('estudiante_id'))
+        ]);
+        const porId = {};
+        perms.forEach(p => porId[p.estudiante_id] = p);
+        const filas = ests.map(e => {
+          const a = { id: e.id };
+          PERMISOS.forEach(([k]) => a[k] = porId[e.id] ? !!porId[e.id][k] : true);
+          aplicarValor(a, permiso, valor);
+          return filaBD(a);
+        });
+        for (let i = 0; i < filas.length; i += 500) {
+          const { error } = await cliente.from('permisos_estudiante')
+            .upsert(filas.slice(i, i + 500), { onConflict: 'estudiante_id' });
+          if (error) throw error;
+        }
+        estadoTodos('Listo ✔ (' + filas.length + ' alumnos)', 'green');
+        cargarCurso();
+      } catch (error) {
+        console.error(error);
+        estadoTodos('Error: ' + (error.message || error), 'red');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function salir() {
+      await cliente.auth.signOut();
+      location.href = 'index.html';
+    }
+
+    iniciar();
+  </script>
+  <script>
+    /* v4.1.1: Descargar listado de alumnos (CSV). Solo usa lo que esta página ya cargó. */
+    function descargarListadoAlumnos() {
+      if (!window.DescargaListados) { alert('Falta el archivo listado-alumnos.js en la carpeta de la plataforma.'); return; }
+      DescargaListados.descargarAlumnos(listadoAlumnos, {
+        curso: DescargaListados.textoCurso('curso'),
+        mensajeVacio: 'No hay alumnos en este curso para descargar. Elige un curso primero.'
+      });
+    }
+  </script>
+  <script src="tema.js"></script>
+</body>
+</html>

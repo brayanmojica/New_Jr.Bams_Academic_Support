@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <script src="tema-inicial.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Módulos nuevos - Administrador</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: var(--tp-fondo, #f6efe4); margin: 0; padding: 20px; }
+    .caja { background: white; padding: 20px; border-radius: 12px; max-width: 1100px;
+            margin: 0 auto 16px; box-shadow: 0 6px 20px rgba(124, 45, 18,0.12);
+            border-top: 5px solid var(--tp-principal, #7c2d12); border-left: 6px solid var(--tp-principal, #7c2d12); box-sizing: border-box; }
+    h1, h2, h3 { color: var(--tp-principal, #7c2d12); margin-top: 0; }
+    select, input, button { padding: 8px; margin: 4px; border-radius: 6px; border: 1px solid #ccc;
+                            font-family: Arial, sans-serif; font-size: 15px; box-sizing: border-box; }
+    button { background: var(--tp-principal, #7c2d12); color: white; border: none; cursor: pointer; padding: 10px 16px; }
+    button:hover { opacity: 0.85; }
+    button.peligro { background: #dc2626; }
+    button.sec { background: #e2e8f0; color: #1e293b; }
+    button.pestania { background: var(--tp-pestania, #efe4d2); color: var(--tp-pestania-texto, #3f2a1c); border: 1px solid var(--tp-pestania-borde, #d9c4a5); border-bottom: 0; border-radius: 8px 8px 0 0; }
+    button.pestania.activa { background: var(--tp-principal, #7c2d12); color: white; }
+    .barra { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .chip { display: inline-block; background: var(--tp-suave, #fbf3e8); color: var(--tp-principal, #7c2d12); border: 1px solid var(--tp-borde, #e0c49a);
+            border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: bold;
+            text-transform: uppercase; letter-spacing: 0.06em; }
+    .panel { display: none; } .panel.activa { display: block; }
+    .desliza { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ddd; padding: 5px 6px; font-size: 14px; text-align: center; }
+    th { background: var(--tp-principal, #7c2d12); color: white; }
+    .izq { text-align: left; }
+    .peq { color: #475569; font-size: 13px; }
+    /* v4.1: muestras del tema (colores fijos, iguales en los dos temas) */
+    .fila-tema { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .muestras-tema { display: flex; flex-wrap: wrap; gap: 14px; margin: 10px 0; }
+    .mini-tema { margin: 0; width: 230px; border: 2px solid #cbd5e1; border-radius: 12px; padding: 8px; background: #fff; }
+    .mini-tema.elegido { border-color: #0f172a; box-shadow: 0 0 0 3px #fde68a; }
+    .mini-tema figcaption { margin-top: 6px; font-size: 13px; font-weight: 700; color: #1c1917; }
+    .mini-cab { display: flex; align-items: center; gap: 6px; height: 26px; border-radius: 6px 6px 0 0; padding: 0 6px; }
+    .mini-barra-cab { width: 14px; height: 14px; border-radius: 3px; }
+    .mini-titulo { font-size: 11px; font-weight: 700; }
+    .mini-cuerpo { display: flex; gap: 6px; padding: 6px; border-radius: 0 0 6px 6px; height: 86px; }
+    .mini-lateral { width: 18px; border-radius: 4px; }
+    .mini-caja { flex: 1; border-radius: 6px; padding: 6px 8px; display: flex; flex-direction: column; justify-content: space-between; font-size: 12px; }
+    .mini-boton { align-self: flex-start; padding: 3px 10px; border-radius: 5px; color: #fff; font-size: 11px; font-weight: 700; }
+    .mini-academico .mini-cab { background: #fffaf3; border-bottom: 2px solid #c4a574; }
+    .mini-academico .mini-barra-cab, .mini-academico .mini-lateral, .mini-academico .mini-boton { background: #7c2d12; }
+    .mini-academico .mini-titulo { color: #1c1917; font-family: Georgia, serif; }
+    .mini-academico .mini-cuerpo { background: #f6efe4; }
+    .mini-academico .mini-caja { background: #fffaf3; border-top: 3px solid #7c2d12; border-left: 3px solid #7c2d12; }
+    .mini-academico .mini-caja b { color: #7c2d12; font-family: Georgia, serif; }
+    .mini-clasico .mini-cab { background: #fff; border-top: 2px solid #1e3a8a; border-bottom: 1px solid #dbe4f0; }
+    .mini-clasico .mini-barra-cab, .mini-clasico .mini-boton { background: #1e3a8a; }
+    .mini-clasico .mini-lateral { background: #fff; border: 1px solid #dbe4f0; }
+    .mini-clasico .mini-titulo { color: #0f172a; }
+    .mini-clasico .mini-cuerpo { background: #eef2f7; }
+    .mini-clasico .mini-caja { background: #fff; border-top: 3px solid #1e3a8a; border-left: 3px solid #1e3a8a; }
+    .mini-clasico .mini-caja b { color: #1e3a8a; }
+    .muestra-fuente { border: 1px solid #d6c4a8; border-radius: 10px; background: var(--tp-papel, #fffaf3); padding: 12px 14px; margin: 8px 0; max-width: 640px; }
+    .colores { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+    .color-item { border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; background: var(--tp-papel, #fffaf3); }
+    .color-item input[type=color] { width: 60px; height: 40px; padding: 0; margin: 4px 0; cursor: pointer; }
+    .matriz td, .matriz th { padding: 3px 4px; font-size: 12px; min-width: 22px; }
+    .matriz td.fin { background: #e5e7eb; color: #475569; }
+    .matriz td.blq { background: #fecaca; color: #991b1b; }
+    .L-P { color: #15803d; font-weight: bold; } .L-A { color: #b91c1c; font-weight: bold; }
+    .L-T { color: #a16207; font-weight: bold; } .L-E { color: #1d4ed8; font-weight: bold; }
+    tr.mes-fila { cursor: pointer; } tr.mes-fila:hover td { background: var(--tp-suave, #fbf3e8); }
+    #estado, #estadoBloq { font-size: 14px; }
+  </style>
+  <link rel="stylesheet" href="diseno.css">
+</head>
+<body>
+
+  <div class="caja">
+    <div class="barra">
+      <div>
+        <span class="chip">Administrador</span>
+        <h1>Módulos nuevos</h1>
+        <p id="saludo">Cargando...</p>
+      </div>
+      <div>
+        <button class="sec" onclick="location.href='admin.html'">← Volver al panel</button>
+        <button onclick="salir()">Cerrar sesión</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="caja">
+    <button class="pestania activa" data-tab="colores" onclick="tab('colores')">Tema, colores y letra</button>
+    <button class="pestania" data-tab="bloqueo" onclick="tab('bloqueo')">Días sin clases</button>
+    <button class="pestania" data-tab="asistencia" onclick="tab('asistencia')">Asistencia 2026-2027</button>
+
+    <!-- ===== COLORES ===== -->
+    <div class="panel activa" id="p-colores">
+      <h2>Tema de la plataforma</h2>
+      <p class="peq">El tema cambia el aspecto de toda la plataforma, también la pantalla para iniciar sesión.
+        Al elegir uno, esta página te muestra cómo quedará. Pulsa «Guardar tema» para que lo vean todos.</p>
+      <div class="fila-tema">
+        <label for="selTema"><b>Tema:</b></label>
+        <select id="selTema" onchange="vistaTema()" aria-describedby="avisoTema"></select>
+      </div>
+      <div class="muestras-tema" id="muestrasTema">
+        <figure class="mini-tema mini-academico" data-tema-muestra="academico">
+          <div class="mini-cab"><span class="mini-barra-cab"></span><span class="mini-titulo">El espacio de Juan</span></div>
+          <div class="mini-cuerpo"><span class="mini-lateral"></span>
+            <div class="mini-caja"><b>Materias</b><span class="mini-boton">Entrar</span></div></div>
+          <figcaption>Académico: terracota y crema</figcaption>
+        </figure>
+        <figure class="mini-tema mini-clasico" data-tema-muestra="clasico">
+          <div class="mini-cab"><span class="mini-barra-cab"></span><span class="mini-titulo">El espacio de Juan</span></div>
+          <div class="mini-cuerpo"><span class="mini-lateral"></span>
+            <div class="mini-caja"><b>Materias</b><span class="mini-boton">Entrar</span></div></div>
+          <figcaption>Clásico: blanco y azul</figcaption>
+        </figure>
+      </div>
+      <p class="peq" id="avisoTema" role="status" aria-live="polite"></p>
+      <button onclick="guardarTema()">Guardar tema</button>
+      <button class="sec" onclick="volverTemaGuardado()">Volver al tema guardado</button>
+      <span id="estadoTema" role="status" aria-live="polite"></span>
+
+      <h2 style="margin-top:22px">Colores de la plataforma</h2>
+      <p class="peq">Elige un color y mira el cambio aquí mismo. Cuando te guste, pulsa «Guardar colores» para que lo vean todos.</p>
+      <div class="colores" id="cajaColores"></div>
+      <button onclick="guardarColores()">Guardar colores</button>
+      <button class="sec" onclick="restaurarColores()">Restaurar originales</button>
+      <span id="estado" role="status" aria-live="polite"></span>
+
+      <h2 style="margin-top:22px">Tipo de letra</h2>
+      <p class="peq">Elige la letra que verán todos los usuarios. Mira el ejemplo y pulsa «Guardar letra».
+        Si una letra no carga (por ejemplo, sin internet), se usa la letra normal de la computadora.</p>
+      <label for="selFuente"><b>Letra:</b></label>
+      <select id="selFuente" onchange="vistaFuente()"></select>
+      <div id="muestraFuente" class="muestra-fuente" aria-live="polite">
+        <p style="font-size:1.25rem;margin:0 0 4px"><b>Calificaciones del primer período</b></p>
+        <p style="margin:0">María López entregó la tarea de Matemática el 12/11/2026. Nota: 85 · Bloque 2.</p>
+        <p style="margin:4px 0 0">0 1 2 3 4 5 6 7 8 9 · Il1 O0 · ¿Qué día es la próxima entrega?</p>
+      </div>
+      <button onclick="guardarFuente()">Guardar letra</button>
+      <span id="estadoFuente" role="status" aria-live="polite"></span>
+    </div>
+
+    <!-- ===== DÍAS BLOQUEADOS ===== -->
+    <div class="panel" id="p-bloqueo">
+      <h2>Bloquear días (feriados o sin clases)</h2>
+      <p class="peq">En un día bloqueado los profesores no pueden registrar ni editar asistencia. No borra asistencias ya guardadas.</p>
+      <label>Desde: <input type="date" id="bDesde"></label>
+      <label>Hasta (opcional): <input type="date" id="bHasta"></label>
+      <label><input type="checkbox" id="bFin" checked> Omitir sábados y domingos</label><br>
+      <input type="text" id="bMotivo" aria-label="Motivo del día sin clases" placeholder="Motivo (ej. Día de la Independencia)" style="width:340px;max-width:100%">
+      <button onclick="bloquear()">Bloquear</button>
+      <span id="estadoBloq"></span>
+      <h3 style="margin-top:18px">Días bloqueados</h3>
+      <label>Año: <select id="bAnio" onchange="listarBloqueos()">
+        <option>2026</option><option>2027</option></select></label>
+      <div class="desliza"><table>
+        <thead><tr><th>Fecha</th><th class="izq">Motivo</th><th></th></tr></thead>
+        <tbody id="tbBloq"></tbody></table></div>
+    </div>
+
+    <!-- ===== ASISTENCIA ===== -->
+    <div class="panel" id="p-asistencia">
+      <h2>Asistencia llevada por los profesores</h2>
+      <label>Año: <select id="aAnio" onchange="cargarAsistencia()">
+        <option>2026</option><option>2027</option></select></label>
+      <label>Curso: <select id="aCurso" onchange="cargarAsistencia()"></select></label>
+      <h3>Resumen por mes</h3>
+      <p class="peq">% de asistencia = (presentes + tardanzas) / registros. Toca un mes para ver el detalle por alumno (elige un curso específico).</p>
+      <div class="desliza"><table>
+        <thead><tr><th class="izq">Mes</th><th>Presentes</th><th>Ausentes</th><th>Tardanzas</th>
+          <th>Excusas</th><th>Registros</th><th>% asist.</th><th>Días bloqueados</th></tr></thead>
+        <tbody id="tbMeses"></tbody></table></div>
+      <h3 style="margin-top:20px" id="tituloDetalle">Detalle por alumno</h3>
+      <div class="desliza" id="detalle"><p class="peq">Elige un curso y toca un mes.</p></div>
+    </div>
+  </div>
+
+    <script src="rol-activo.js"></script>
+    <script src="diseno.js"></script>
+  <script>Diseno.montar({grupo:"admin", pagina:"admin_modulos.html"});</script>
+<script src="tema.js"></script>
+  <script>
+    const SUPABASE_URL = 'https://twhdnaiwxpilrevngxkk.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_lEIcvZOVtVD9HIK8HFwRtg_ik68D5Ad';
+    const cliente = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const ETIQ_COLOR = {
+      color_principal: 'Color principal (botones, títulos, tablas)',
+      color_fondo: 'Fondo de la página',
+      color_suave: 'Color suave (etiquetas y resaltados)',
+      color_borde: 'Borde de las etiquetas',
+      color_alerta: 'Color de alerta (notas bajas)'
+    };
+    let cursos = [], bloqueos = [], mesSel = null;
+
+    function esc(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    function fmtFecha(f) { return f.split('-').reverse().join('/'); }
+    function ymd(d) {
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+    function msg(id, t, color) { const e = document.getElementById(id); e.style.color = color || '#334155'; e.textContent = t || ''; }
+
+    async function traerTodo(consulta) {
+      let todo = [], desde = 0;
+      while (true) {
+        const { data, error } = await consulta(desde, desde + 999);
+        if (error) throw error;
+        todo = todo.concat(data || []);
+        if (!data || data.length < 1000) break;
+        desde += 1000;
+      }
+      return todo;
+    }
+
+    function tab(nombre) {
+      document.querySelectorAll('.pestania').forEach(b => b.classList.toggle('activa', b.dataset.tab === nombre));
+      document.querySelectorAll('.panel').forEach(p => p.classList.toggle('activa', p.id === 'p-' + nombre));
+      if (nombre === 'bloqueo') listarBloqueos();
+      if (nombre === 'asistencia') cargarAsistencia();
+    }
+
+    async function iniciar() {
+      const { data: { session } } = await cliente.auth.getSession();
+      if (!session) { location.href = 'index.html'; return; }
+      const { data: perfil } = await cliente.from('perfiles')
+        .select('nombre, rol').eq('id', session.user.id).single();
+      const _ex = await cliente.from('roles_adicionales').select('rol').eq('perfil_id', session.user.id);
+      const _roles = perfil ? [perfil.rol].concat((_ex.data || []).map(x => x.rol)) : [];
+      if (!perfil || (!_roles.includes('admin') && !_roles.includes('coordinador'))) {
+        // v3: sin alerta; vuelve al inicio del rol activo (o a elegir rol)
+        if (perfil && window.RolActivo && RolActivo.alInicio(_roles)) return;
+        alert('Esta página es solo para administración o coordinación');
+        location.href = 'index.html'; return;
+      }
+      const visual = window.RolActivo
+        ? RolActivo.preparar({ perfil: perfil, roles: _roles }, 'admin_modulos.html')
+        : null;
+      if (window.RolActivo && !visual) return;
+      const rolVista = visual ? visual.rol : (!_roles.includes('admin') ? 'coordinador' : 'admin');
+      document.getElementById('saludo').textContent = ((visual && visual.etiqueta) || (rolVista === 'admin' ? 'Administrador(a)' : 'Coordinador(a)')) + ': ' + perfil.nombre;
+      if (visual) RolActivo.aplicarDiseno(visual, session.user.id);
+
+      const { data } = await cliente.from('cursos').select('id, grado, seccion').order('grado').order('seccion');
+      cursos = data || [];
+      const sel = document.getElementById('aCurso');
+      sel.add(new Option('Todos los cursos', ''));
+      cursos.forEach(c => sel.add(new Option(c.grado + ' ' + c.seccion, c.id)));
+      cargarColores();
+    }
+
+    // ================= TEMA (v4.1) =================
+    let crudoTema = {}, temaGuardado = 'academico';
+    function cargarTemas(actual) {
+      const sel = document.getElementById('selTema');
+      const T = window.TEMA_NOMBRES || { academico: { nombre: 'Académico' }, clasico: { nombre: 'Clásico' } };
+      sel.innerHTML = '';
+      Object.keys(T).forEach(k => sel.add(new Option(T[k].nombre + (k === 'academico' ? ' · recomendado' : ''), k, false, k === actual)));
+      marcarMuestra(actual);
+    }
+    function marcarMuestra(k) {
+      document.querySelectorAll('[data-tema-muestra]').forEach(f => f.classList.toggle('elegido', f.dataset.temaMuestra === k));
+    }
+    function pintarColores(t) {
+      Object.keys(ETIQ_COLOR).forEach(k => {
+        const i = document.getElementById(k); if (!i) return;
+        i.value = t[k]; document.getElementById('v_' + k).textContent = t[k];
+      });
+    }
+    function vistaTema() {
+      const k = document.getElementById('selTema').value;
+      const selF = document.getElementById('selFuente');
+      const t = window.normalizarTema(Object.assign({}, crudoTema, { tema: k, fuente: (selF && selF.value) || crudoTema.fuente }));
+      window.aplicarTema(t, false);
+      pintarColores(t);
+      marcarMuestra(k);
+      const T = window.TEMA_NOMBRES || {};
+      document.getElementById('avisoTema').textContent = k === temaGuardado
+        ? 'Este es el tema guardado.'
+        : 'Vista previa: así se verá con el tema «' + ((T[k] && T[k].nombre) || k) + '». Todavía no está guardado; pulsa «Guardar tema» para aplicarlo a todos.';
+      msg('estadoTema', '');
+    }
+    function volverTemaGuardado() {
+      document.getElementById('selTema').value = temaGuardado;
+      vistaTema();
+    }
+    async function guardarTema() {
+      const k = document.getElementById('selTema').value;
+      msg('estadoTema', 'Guardando...');
+      const { error } = await cliente.from('config_tema').upsert([{ clave: 'tema', valor: k }], { onConflict: 'clave' });
+      if (error) {
+        msg('estadoTema', 'No se pudo guardar el tema: ' + error.message + '. Se seguirá usando el tema anterior.', '#b91c1c');
+        return;
+      }
+      crudoTema.tema = k; temaGuardado = k;
+      const selF = document.getElementById('selFuente');
+      const t = window.normalizarTema(Object.assign({}, crudoTema, { tema: k, fuente: (selF && selF.value) || crudoTema.fuente }));
+      window.aplicarTema(t, true);
+      document.getElementById('avisoTema').textContent = 'Este es el tema guardado.';
+      msg('estadoTema', 'Tema guardado ✔ Todos lo verán al abrir la plataforma.', '#15803d');
+    }
+
+    // ================= COLORES =================
+    async function cargarColores() {
+      const { data } = await cliente.from('config_tema').select('clave, valor');
+      const crudo = {};
+      (data || []).forEach(f => crudo[f.clave] = f.valor);
+      // v4.1: sin fila «tema» en la base, el tema es «Académico»
+      crudo.tema = (crudo.tema === 'clasico' || crudo.tema === 'academico') ? crudo.tema
+        : ((data || []).length ? 'academico' : (window.temaActual ? window.temaActual() : 'academico'));
+      crudoTema = Object.assign({}, crudo);
+      temaGuardado = crudo.tema;
+      cargarTemas(temaGuardado);
+      document.getElementById('avisoTema').textContent = 'Este es el tema guardado.';
+      // v4: los azules viejos por defecto se muestran como la identidad nueva
+      const t = window.normalizarTema ? window.normalizarTema(crudo) : Object.assign({}, window.TEMA_DEFECTO, crudo);
+      cargarFuentes(t.fuente || 'sistema');
+      document.getElementById('cajaColores').innerHTML = Object.keys(ETIQ_COLOR).map(k =>
+        '<div class="color-item"><b>' + ETIQ_COLOR[k] + '</b><br>' +
+        '<input type="color" id="' + k + '" aria-label="' + esc(ETIQ_COLOR[k] || k) + '" value="' + t[k] + '" oninput="vistaPrevia()"> ' +
+        '<span class="peq" id="v_' + k + '">' + t[k] + '</span></div>').join('');
+    }
+    function leerColores() {
+      const t = {};
+      Object.keys(ETIQ_COLOR).forEach(k => {
+        t[k] = document.getElementById(k).value;
+        document.getElementById('v_' + k).textContent = t[k];
+      });
+      return t;
+    }
+    function vistaPrevia() {
+      const t = leerColores();
+      const sel = document.getElementById('selFuente');
+      if (sel && sel.value) t.fuente = sel.value;
+      t.tema = document.getElementById('selTema').value || temaGuardado;
+      window.aplicarTema(t, false);
+    }
+    async function guardarColores() {
+      const t = leerColores();
+      msg('estado', 'Guardando...');
+      const filas = Object.keys(t).map(k => ({ clave: k, valor: t[k] }));
+      const { error } = await cliente.from('config_tema').upsert(filas, { onConflict: 'clave' });
+      if (error) { msg('estado', 'Error: ' + error.message, 'red'); return; }
+      const sel = document.getElementById('selFuente');
+      try { const g = JSON.parse(localStorage.getItem('tema_colores') || '{}'); if (g.fuente) t.fuente = g.fuente; } catch (e) {}
+      Object.assign(crudoTema, leerColores());
+      // Los colores se guardan con el tema GUARDADO (la vista previa de otro tema no se guarda aquí)
+      t.tema = temaGuardado;
+      document.getElementById('selTema').value = temaGuardado; marcarMuestra(temaGuardado);
+      window.aplicarTema(t, true);
+      msg('estado', 'Colores guardados ✔', '#15803d');
+    }
+    function restaurarColores() {
+      const D = (window.TEMA_DEFECTOS || {})[document.getElementById('selTema').value] || window.TEMA_DEFECTO;
+      Object.keys(ETIQ_COLOR).forEach(k => document.getElementById(k).value = D[k]);
+      vistaPrevia();
+      msg('estado', 'Originales cargados. Pulsa Guardar para aplicarlos a todos.', '#334155');
+    }
+
+    // ================= TIPO DE LETRA (v4) =================
+    function cargarFuentes(actual) {
+      const sel = document.getElementById('selFuente');
+      const F = window.TEMA_FUENTES || {};
+      sel.innerHTML = '';
+      Object.keys(F).forEach(k => sel.add(new Option(F[k].nombre, k, false, k === actual)));
+      vistaFuente();
+    }
+    function vistaFuente() {
+      const k = document.getElementById('selFuente').value;
+      const F = window.TEMA_FUENTES || {};
+      if (!F[k]) return;
+      if (F[k].google && !document.getElementById('fuente-google-' + k)) {
+        const l = document.createElement('link');
+        l.rel = 'stylesheet'; l.id = 'fuente-google-' + k;
+        l.href = 'https://fonts.googleapis.com/css2?family=' + F[k].google + '&display=swap';
+        document.head.appendChild(l);
+      }
+      document.getElementById('muestraFuente').style.setProperty('font-family', F[k].pila, 'important');
+    }
+    async function guardarFuente() {
+      const k = document.getElementById('selFuente').value;
+      msg('estadoFuente', 'Guardando...');
+      const { error } = await cliente.from('config_tema').upsert([{ clave: 'fuente', valor: k }], { onConflict: 'clave' });
+      if (error) {
+        msg('estadoFuente', 'No se pudo guardar la letra: ' + error.message + '. Se seguirá usando la letra anterior.', '#b91c1c');
+        return;
+      }
+      if (window.aplicarFuente) window.aplicarFuente(k);
+      try {
+        const t = JSON.parse(localStorage.getItem('tema_colores') || '{}');
+        t.fuente = k; localStorage.setItem('tema_colores', JSON.stringify(t));
+      } catch (e) {}
+      msg('estadoFuente', 'Letra guardada ✔ Todos la verán al abrir la plataforma.', '#15803d');
+    }
+
+    // ================= DÍAS BLOQUEADOS =================
+    async function bloquear() {
+      const desde = document.getElementById('bDesde').value;
+      const hasta = document.getElementById('bHasta').value || desde;
+      const motivo = document.getElementById('bMotivo').value.trim() || null;
+      const omitir = document.getElementById('bFin').checked;
+      if (!desde) { msg('estadoBloq', 'Elige la fecha', 'red'); return; }
+      if (hasta < desde) { msg('estadoBloq', 'La fecha final es anterior a la inicial', 'red'); return; }
+      const filas = [];
+      const d = new Date(desde + 'T12:00:00'), fin = new Date(hasta + 'T12:00:00');
+      while (d <= fin && filas.length < 400) {
+        const dow = d.getDay();
+        if (!(omitir && (dow === 0 || dow === 6) && desde !== hasta)) filas.push({ fecha: ymd(d), motivo });
+        d.setDate(d.getDate() + 1);
+      }
+      if (!filas.length) { msg('estadoBloq', 'No hay días hábiles en ese rango', 'red'); return; }
+      msg('estadoBloq', 'Guardando...');
+      const { error } = await cliente.from('dias_bloqueados').upsert(filas, { onConflict: 'fecha' });
+      if (error) { msg('estadoBloq', 'Error: ' + error.message, 'red'); return; }
+      msg('estadoBloq', filas.length + ' día(s) bloqueado(s) ✔', 'green');
+      document.getElementById('bMotivo').value = '';
+      listarBloqueos();
+    }
+    async function listarBloqueos() {
+      const anio = document.getElementById('bAnio').value;
+      const { data } = await cliente.from('dias_bloqueados').select('fecha, motivo')
+        .gte('fecha', anio + '-01-01').lte('fecha', anio + '-12-31').order('fecha');
+      bloqueos = data || [];
+      document.getElementById('tbBloq').innerHTML = bloqueos.length
+        ? bloqueos.map(b => '<tr><td>' + fmtFecha(b.fecha) + '</td><td class="izq">' + esc(b.motivo || '') +
+          '</td><td><button class="peligro" onclick="desbloquear(\'' + b.fecha + '\')">Quitar</button></td></tr>').join('')
+        : '<tr><td colspan="3" class="peq">No hay días bloqueados en ' + anio + '.</td></tr>';
+    }
+    async function desbloquear(f) {
+      if (!confirm('¿Quitar el bloqueo del ' + fmtFecha(f) + '?')) return;
+      const { error } = await cliente.from('dias_bloqueados').delete().eq('fecha', f);
+      if (error) { msg('estadoBloq', 'Error: ' + error.message, 'red'); return; }
+      listarBloqueos();
+    }
+
+    // ================= ASISTENCIA =================
+    async function cargarAsistencia() {
+      const anio = Number(document.getElementById('aAnio').value);
+      const cursoId = document.getElementById('aCurso').value;
+      let q = cliente.from('asistencia_mensual').select('*').eq('anio', anio);
+      if (cursoId) q = q.eq('curso_id', Number(cursoId));
+      const [r, b] = await Promise.all([
+        q,
+        cliente.from('dias_bloqueados').select('fecha').gte('fecha', anio + '-01-01').lte('fecha', anio + '-12-31')
+      ]);
+      const filas = r.data || [];
+      const blq = b.data || [];
+      let html = '';
+      for (let m = 1; m <= 12; m++) {
+        const f = filas.filter(x => x.mes === m);
+        const s = k => f.reduce((t, x) => t + Number(x[k]), 0);
+        const tot = s('total'), pres = s('presentes'), tar = s('tardanzas');
+        const nb = blq.filter(x => Number(x.fecha.slice(5, 7)) === m).length;
+        html += '<tr class="mes-fila" onclick="verMes(' + anio + ',' + m + ')"><td class="izq"><b>' + MESES[m - 1] + ' ' + anio + '</b></td>' +
+          (tot ? '<td>' + pres + '</td><td>' + s('ausentes') + '</td><td>' + tar + '</td><td>' + s('excusas') +
+            '</td><td>' + tot + '</td><td><b>' + ((pres + tar) / tot * 100).toFixed(1) + '%</b></td>'
+            : '<td colspan="6" class="peq">Sin registros</td>') +
+          '<td>' + nb + '</td></tr>';
+      }
+      document.getElementById('tbMeses').innerHTML = html;
+      if (mesSel && mesSel.anio === anio) verMes(anio, mesSel.mes); else {
+        mesSel = null;
+        document.getElementById('detalle').innerHTML = '<p class="peq">Elige un curso y toca un mes.</p>';
+        document.getElementById('tituloDetalle').textContent = 'Detalle por alumno';
+      }
+    }
+
+    async function verMes(anio, mes) {
+      mesSel = { anio, mes };
+      const cursoId = document.getElementById('aCurso').value;
+      const caja = document.getElementById('detalle');
+      const curso = cursos.find(c => String(c.id) === cursoId);
+      document.getElementById('tituloDetalle').textContent =
+        'Detalle: ' + MESES[mes - 1] + ' ' + anio + (curso ? ' · ' + curso.grado + ' ' + curso.seccion : '');
+      if (!cursoId) { caja.innerHTML = '<p class="peq">Elige un curso específico para ver el detalle por alumno.</p>'; return; }
+      caja.innerHTML = '<p class="peq">Cargando...</p>';
+
+      const dias = new Date(anio, mes, 0).getDate();
+      const ini = anio + '-' + String(mes).padStart(2, '0') + '-01';
+      const fin = anio + '-' + String(mes).padStart(2, '0') + '-' + String(dias).padStart(2, '0');
+      try {
+        const [al, asis, bl] = await Promise.all([
+          cliente.from('estudiantes').select('id, nombre, apellido, orden').eq('curso_id', Number(cursoId))
+            .order('orden', { nullsFirst: false }).order('apellido'),
+          traerTodo((d, h) => cliente.from('asistencias').select('estudiante_id, fecha, estado')
+            .eq('curso_id', Number(cursoId)).gte('fecha', ini).lte('fecha', fin).range(d, h)),
+          cliente.from('dias_bloqueados').select('fecha, motivo').gte('fecha', ini).lte('fecha', fin)
+        ]);
+        const mapa = {};
+        asis.forEach(x => { mapa[x.estudiante_id + '|' + Number(x.fecha.slice(8, 10))] = x.estado; });
+        const bloq = {};
+        (bl.data || []).forEach(x => bloq[Number(x.fecha.slice(8, 10))] = x.motivo || 'Bloqueado');
+
+        let h = '<table class="matriz"><thead><tr><th class="izq">Alumno</th>';
+        for (let d = 1; d <= dias; d++) h += '<th>' + d + '</th>';
+        h += '<th>P</th><th>A</th><th>T</th><th>E</th></tr></thead><tbody>';
+        (al.data || []).forEach(a => {
+          const c = { presente: 0, ausente: 0, tardanza: 0, excusa: 0 };
+          h += '<tr><td class="izq">' + esc(a.apellido) + ', ' + esc(a.nombre) + '</td>';
+          for (let d = 1; d <= dias; d++) {
+            const est = mapa[a.id + '|' + d];
+            const dow = new Date(anio, mes - 1, d).getDay();
+            if (est) c[est]++;
+            const L = est ? est[0].toUpperCase() : '';
+            const clase = est ? 'L-' + L : (bloq[d] ? 'blq' : (dow === 0 || dow === 6 ? 'fin' : ''));
+            h += '<td class="' + clase + '"' + (bloq[d] ? ' title="' + esc(bloq[d]) + '"' : '') + '>' +
+              (est ? L : (bloq[d] ? '✕' : '')) + '</td>';
+          }
+          h += '<td>' + c.presente + '</td><td>' + c.ausente + '</td><td>' + c.tardanza + '</td><td>' + c.excusa + '</td></tr>';
+        });
+        h += '</tbody></table><p class="peq">P = presente · A = ausente · T = tardanza · E = excusa · ✕ = día bloqueado · gris = fin de semana</p>';
+        caja.innerHTML = h;
+      } catch (e) {
+        caja.innerHTML = '<p style="color:red">Error: ' + esc(e.message) + '</p>';
+      }
+    }
+
+    async function salir() {
+      await cliente.auth.signOut();
+      location.href = 'index.html';
+    }
+
+    iniciar();
+  </script>
+</body>
+</html>

@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <script src="tema-inicial.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mis datos</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="comun.js"></script>
+  <script src="rol-activo.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: var(--tp-fondo, #f6efe4); margin: 0; padding: 20px; }
+    .caja { background: white; padding: 20px; border-radius: 12px; max-width: 900px; margin: 0 auto 16px;
+            box-shadow: 0 6px 20px rgba(124, 45, 18,0.12); border-top: 5px solid var(--tp-principal, #7c2d12);
+            border-left: 6px solid var(--tp-principal, #7c2d12); box-sizing: border-box; }
+    h1, h2, h3 { color: var(--tp-principal, #7c2d12); margin-top: 0; }
+    select, input, button { padding: 8px; margin: 4px 0; border-radius: 6px; border: 1px solid #ccc;
+                            font-family: Arial, sans-serif; font-size: 14px; box-sizing: border-box; }
+    button { background: var(--tp-principal, #7c2d12); color: white; border: none; cursor: pointer; padding: 9px 14px; margin-right: 6px; }
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.4; cursor: default; }
+    button.sec { background: #e2e8f0; color: #1e293b; }
+    button.peligro { background: #dc2626; }
+    .barra { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .chip { display: inline-block; background: var(--tp-suave, #fbf3e8); color: var(--tp-principal, #7c2d12); border: 1px solid var(--tp-borde, #e0c49a); border-radius: 999px;
+            padding: 4px 12px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.06em; }
+    .peq { color: #475569; font-size: 13px; }
+    .aviso { padding: 10px 14px; border-radius: 8px; margin: 10px 0; font-size: 14px; background: var(--tp-suave, #fbf3e8);
+             color: var(--tp-principal, #7c2d12); border: 1px solid var(--tp-borde, #e0c49a); }
+    .aviso.alerta { background: #fef9c3; color: #854d0e; border-color: #fde68a; }
+    .rejilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px 14px; }
+    .rejilla label { font-size: 13px; color: #475569; display: block; }
+    .rejilla input, .rejilla select { width: 100%; margin: 2px 0; }
+    .tutor { border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; margin: 10px 0; background: var(--tp-papel, #fffaf3); }
+    .etq { display: inline-block; border-radius: 999px; padding: 1px 10px; font-size: 12px; font-weight: bold; background: #e2e8f0; }
+    .etq.pendiente { background: #fef9c3; color: #854d0e; }
+    .etq.aprobada, .etq.aprobado { background: #dcfce7; color: #166534; }
+    .etq.rechazada, .etq.rechazado { background: #fee2e2; color: #b91c1c; }
+    .docs { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin: 10px 0; }
+    .doc { border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px; font-size: 13px; }
+    .doc img { width: 100%; height: 120px; object-fit: contain; background: #f1f5f9; border-radius: 6px; }
+    .hist { border-bottom: 1px solid #e2e8f0; padding: 6px 0; font-size: 14px; }
+    #estado { font-size: 14px; }
+  </style>
+  <link rel="stylesheet" href="diseno.css">
+</head>
+<body>
+
+  <div class="caja">
+    <div class="barra">
+      <div>
+        <span class="chip" id="chipRol">Mis datos</span>
+        <h1>Mis datos personales</h1>
+        <p id="saludo">Cargando...</p>
+      </div>
+      <div>
+        <button class="sec" id="btnVolver">← Volver</button>
+        <button onclick="App.salir()">Cerrar sesión</button>
+      </div>
+    </div>
+    <div class="aviso" id="cupo"></div>
+    <span id="estado"></span>
+  </div>
+
+  <div class="caja" id="cajaDatos" style="display:none">
+    <h2>Corregir mis datos</h2>
+    <p class="peq">Cambia solo lo que esté mal. Tus cambios los revisa la secretaría antes de aplicarse.</p>
+    <div class="rejilla" id="formDatos"></div>
+    <button id="btnDatos">Enviar cambios a revisión</button>
+  </div>
+
+  <div class="caja" id="cajaTutores" style="display:none">
+    <h2>Datos de mis padres o tutores</h2>
+    <p class="peq">Escribe a todos en un solo envío (cuenta como 1 edición). Al aprobarse, esta lista reemplaza la anterior.</p>
+    <div id="listaTutores"></div>
+    <button class="sec" id="btnMasTutor">+ Agregar persona</button>
+    <button id="btnTutores">Enviar a revisión</button>
+  </div>
+
+  <div class="caja" id="cajaDocs">
+    <h2 id="tituloDocs">Mis documentos</h2>
+    <p class="peq" id="ayudaDocs">Aquí ves tus documentos guardados en el liceo y si la secretaría ya los aprobó.</p>
+    <div class="docs" id="listaDocs"></div>
+    <div id="permisoSubida" style="display:none"></div>
+    <div id="subida" style="display:none">
+      <hr>
+      <p class="peq">Sube una foto clara de cada documento (por ejemplo, tu título o tu acta de nacimiento). La secretaría la revisa y la aprueba.</p>
+      <select id="s_tipo" aria-label="Tipo de documento"></select>
+      <input id="s_desc" aria-label="Descripción del documento" maxlength="120" placeholder="Descripción (ej. Licenciatura en Educación)">
+      <input id="s_archivo" aria-label="Archivo del documento (imagen JPEG, PNG o WebP)" type="file" accept="image/jpeg,image/png,image/webp">
+      <button id="btnSubir">Subir imagen</button>
+    </div>
+  </div>
+
+  <div class="caja" id="cajaHistorial">
+    <h2>Mis solicitudes</h2>
+    <div id="historial"><p class="peq">Cargando...</p></div>
+  </div>
+
+    <script src="diseno.js"></script>
+  <script>Diseno.montar({grupoDinamico:true, pagina:"mis_datos.html"});</script>
+<script>
+    const cliente = App.cliente, esc = App.esc, $ = id => document.getElementById(id);
+    const ETQ = { nombre: 'Nombre', apellido: 'Apellido', cedula: 'Cédula', fecha_nacimiento: 'Fecha de nacimiento',
+      lugar_nacimiento: 'Lugar de nacimiento', sexo: 'Sexo', telefono: 'Teléfono', direccion: 'Dirección' };
+    const CAMPOS = ['nombre', 'apellido', 'cedula', 'fecha_nacimiento', 'lugar_nacimiento', 'sexo', 'telefono', 'direccion'];
+    const TIPOS_DOC = { titulo: 'Título universitario', certificado: 'Certificado', cedula: 'Cédula', acta_nacimiento: 'Acta de nacimiento', otro: 'Otro' };
+    const msg = (t, c) => App.estado('estado', t, c);
+    let ctx, est = null, esDoc = false, actual = {}, tutores = [], limite = 2, usadas = 0, nDocs = 0;
+    // v4: quién sube directo y quién debe pedir permiso a la secretaría
+    let rolAct = '', directo = false, tieneDatos = false, permisoVigente = false;
+    const SUBEN_DIRECTO = ['admin', 'secretaria', 'profesor'];
+
+    function inicioMes() {
+      const ym = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santo_Domingo', year: 'numeric', month: '2-digit' }).format(new Date());
+      return new Date(ym + '-01T00:00:00-04:00').toISOString();
+    }
+
+    async function iniciar() {
+      ctx = await App.exigirRol(['estudiante', 'padre', 'profesor', 'admin', 'secretaria', 'coordinador']);
+      if (!ctx) return;
+      const visual = window.RolActivo ? RolActivo.preparar(ctx, 'mis_datos.html') : null;
+      if (window.RolActivo && !visual) return;
+      if (visual) RolActivo.aplicarDiseno(visual, ctx.uid);
+      const e = await cliente.from('estudiantes').select('id, nombre, apellido').eq('usuario_id', ctx.uid).limit(1).maybeSingle();
+      est = e.data || null;
+      rolAct = (visual && visual.rol) || ctx.perfil.rol;
+      if (rolAct !== 'estudiante') est = null;   // v4: con otro rol activo se ven los documentos de esa cuenta
+      esDoc = !est && rolAct === 'profesor';   // v3: según el rol activo
+      directo = SUBEN_DIRECTO.includes(rolAct);
+      tieneDatos = !!(est || esDoc);
+      $('chipRol').textContent = (visual && visual.etiqueta) || (est ? 'Alumno' : 'Docente');
+      $('saludo').textContent = ctx.perfil.nombre + ' ' + ctx.perfil.apellido;
+      $('btnVolver').onclick = () => {
+        const destino = visual && visual.rol && RolActivo.rutas()[visual.rol];
+        location.href = destino || (est ? 'familia.html' : 'profesor.html');
+      };
+      Object.keys(TIPOS_DOC).forEach(k => $('s_tipo').add(new Option(TIPOS_DOC[k], k)));
+      $('btnSubir').addEventListener('click', subirDoc);
+      $('tituloDocs').textContent = esDoc ? 'Mis documentos y títulos' : 'Mis documentos';
+      if (!tieneDatos) {
+        $('cupo').textContent = 'En esta página puedes ver y subir tus documentos.';
+        $('cajaHistorial').style.display = 'none';
+        recargar();
+        return;
+      }
+
+      $('cajaDatos').style.display = '';
+      if (est) $('cajaTutores').style.display = '';
+      $('btnDatos').addEventListener('click', enviarDatos);
+      $('btnMasTutor').addEventListener('click', () => { tutores = leerTutores(); tutores.push({ parentesco: 'padre' }); dibujarTutores(); });
+      $('btnTutores').addEventListener('click', enviarTutores);
+      $('listaTutores').addEventListener('click', ev => {
+        const b = ev.target.closest('[data-quitar]');
+        if (!b) return;
+        tutores = leerTutores(); tutores.splice(Number(b.dataset.quitar), 1); dibujarTutores();
+      });
+      recargar();
+    }
+
+    async function recargar() {
+      if (!tieneDatos) {
+        const docs = await cliente.from('documentos_persona').select('*').eq('perfil_id', ctx.uid).order('creado_en');
+        nDocs = (docs.data || []).length;
+        await dibujarDocs(docs.data || []);
+        await pintarPermiso();
+        return;
+      }
+      const llave = est ? 'estudiante_id' : 'perfil_id', id = est ? est.id : ctx.uid;
+      const [d, t, h, cfg, docs] = await Promise.all([
+        cliente.from('datos_personales').select('*').eq(llave, id).maybeSingle(),
+        est ? cliente.from('tutores_estudiante').select('*').eq('estudiante_id', id).order('parentesco') : Promise.resolve({ data: [] }),
+        cliente.from('solicitudes_cambio').select('*').eq('perfil_id', ctx.uid).order('creado_en', { ascending: false }).limit(30),
+        cliente.from('config_sistema').select('valor').eq('clave', 'ediciones_por_mes').maybeSingle(),
+        cliente.from('documentos_persona').select('*').eq(llave, id).order('creado_en')]);
+      if (d.error || h.error) { msg('No se pudieron cargar tus datos: ' + (d.error || h.error).message + '. Vuelve a intentarlo más tarde.', 'red'); return; }
+      const dp = d.data || {};
+      actual = { nombre: est ? est.nombre : ctx.perfil.nombre, apellido: est ? est.apellido : ctx.perfil.apellido,
+        cedula: dp.cedula, fecha_nacimiento: dp.fecha_nacimiento, lugar_nacimiento: dp.lugar_nacimiento,
+        sexo: dp.sexo, telefono: dp.telefono, direccion: dp.direccion };
+      tutores = (t.data || []).slice();
+      limite = cfg.data ? Number(cfg.data.valor) : 2;
+      const inicio = inicioMes();
+      usadas = (h.data || []).filter(s => s.estado !== 'rechazada' && s.creado_en >= inicio).length;
+      const quedan = Math.max(0, limite - usadas);
+      $('cupo').className = 'aviso' + (quedan === 0 ? ' alerta' : '');
+      $('cupo').textContent = 'Ediciones disponibles este mes: ' + quedan + ' de ' + limite +
+        (quedan === 0 ? '. Podrás editar de nuevo el próximo mes.' : '. Las solicitudes rechazadas no cuentan.');
+      $('btnDatos').disabled = $('btnTutores').disabled = quedan === 0;
+
+      dibujarForm(); dibujarTutores(); dibujarHistorial(h.data || []);
+      nDocs = (docs.data || []).length;
+      await dibujarDocs(docs.data || []);
+      await pintarPermiso();
+    }
+
+    // ---------- v4: permiso para subir documentos ----------
+    const fmtDia = f => f ? new Date(f).toLocaleDateString('es-DO') : '';
+    async function pintarPermiso() {
+      const caja = $('permisoSubida');
+      permisoVigente = false;
+      if (directo) {
+        caja.style.display = 'none';
+        $('subida').style.display = '';
+        return;
+      }
+      $('subida').style.display = 'none';
+      caja.style.display = '';
+      const flags = (window.Diseno && Diseno.banderas) ? await Diseno.banderas(cliente) : {};
+      if (!flags.v4_permisos_subida) {
+        // Pendiente de SQL (sql/04): todavía no existe la tabla de permisos
+        caja.innerHTML = '<p class="peq">Por ahora tus documentos los sube la secretaría del liceo. ' +
+          'Muy pronto podrás pedir permiso aquí para subirlos tú mismo.</p>';
+        return;
+      }
+      const r = await cliente.from('permisos_subida').select('*').eq('perfil_id', ctx.uid)
+        .order('creado_en', { ascending: false }).limit(1);
+      if (r.error) {
+        caja.innerHTML = '<p class="peq">No se pudo revisar tu permiso para subir documentos. Por ahora los sube la secretaría.</p>';
+        return;
+      }
+      const u = (r.data || [])[0];
+      const vigente = u && u.estado === 'aprobado' && (!u.vence_en || new Date(u.vence_en) > new Date());
+      if (u && u.estado === 'pendiente') {
+        caja.innerHTML = '<p class="aviso" role="status">Solicitud enviada, espera la respuesta de secretaría.</p>';
+        return;
+      }
+      if (vigente) {
+        permisoVigente = true;
+        caja.innerHTML = '<p class="aviso" role="status">La secretaría aprobó tu permiso. Puedes subir documentos' +
+          (u.vence_en ? ' hasta el ' + esc(fmtDia(u.vence_en)) : '') + '.</p>';
+        $('subida').style.display = '';
+        return;
+      }
+      caja.innerHTML =
+        (u && u.estado === 'rechazado' ? '<p class="peq">La secretaría no aprobó tu solicitud anterior' +
+          (u.motivo ? '. Motivo: ' + esc(u.motivo) : '') + '. Puedes pedirlo otra vez.</p>' : '') +
+        (u && u.estado === 'aprobado' ? '<p class="peq">Tu permiso anterior ya venció. Puedes pedirlo otra vez.</p>' : '') +
+        '<p class="peq">Para subir un documento primero pide permiso. La secretaría te responderá aquí mismo.</p>' +
+        '<button type="button" class="btn-pedir-permiso sin-tema" id="btnPedirPermiso">Pedir permiso</button>';
+      $('btnPedirPermiso').addEventListener('click', pedirPermiso);
+    }
+    async function pedirPermiso() {
+      const b = $('btnPedirPermiso');
+      if (b) b.disabled = true;
+      msg('Enviando solicitud...');
+      const { error } = await cliente.rpc('pedir_permiso_subida', { p_motivo: null });
+      if (error) { msg('No se pudo enviar la solicitud: ' + friendly(error), 'red'); if (b) b.disabled = false; return; }
+      msg('Solicitud enviada ✔', 'green');
+      await pintarPermiso();
+      const aviso = $('permisoSubida').querySelector('.aviso');
+      if (aviso) { aviso.setAttribute('tabindex', '-1'); aviso.focus(); }
+    }
+
+    function dibujarForm() {
+      const inp = (k, tipo) => '<div><label>' + ETQ[k] + '<input id="d_' + k + '" type="' + (tipo || 'text') + '" maxlength="200" value="' +
+        esc(actual[k] || '') + '"></label></div>';
+      $('formDatos').innerHTML = inp('nombre') + inp('apellido') + inp('cedula') + inp('fecha_nacimiento', 'date') + inp('lugar_nacimiento') +
+        '<div><label>Sexo<select id="d_sexo"><option value="">—</option><option value="M"' + (actual.sexo === 'M' ? ' selected' : '') +
+        '>Masculino</option><option value="F"' + (actual.sexo === 'F' ? ' selected' : '') + '>Femenino</option></select></label></div>' +
+        inp('telefono') + inp('direccion');
+    }
+
+    function friendly(error) {
+      const m = error.message || '';
+      if (m.includes('LIMITE_MENSUAL')) return 'Ya usaste tus ediciones de este mes.';
+      return m.replace(/^.*?: /, '') || 'Error desconocido';
+    }
+
+    async function enviarDatos() {
+      const datos = {};
+      CAMPOS.forEach(k => {
+        const nuevo = $('d_' + k).value.trim(), viejo = (actual[k] || '').toString().trim();
+        if (nuevo !== viejo) datos[k] = nuevo;
+      });
+      if (!Object.keys(datos).length) { msg('No cambiaste nada', 'red'); return; }
+      if (!confirm('Esto usa 1 de tus ediciones del mes. ¿Enviar a revisión?')) return;
+      $('btnDatos').disabled = true; msg('Enviando...');
+      const { error } = await cliente.from('solicitudes_cambio').insert({ perfil_id: ctx.uid, tipo: 'datos', datos });
+      if (error) { msg(friendly(error), 'red'); $('btnDatos').disabled = false; return; }
+      msg('Enviado ✔ La secretaría lo revisará.', 'green');
+      recargar();
+    }
+
+    // ---------- Tutores ----------
+    function dibujarTutores() {
+      $('listaTutores').innerHTML = tutores.length ? tutores.map((t, i) =>
+        '<div class="tutor" data-i="' + i + '"><div class="rejilla">' +
+        '<div><label>Parentesco<select class="t_par"><option value="padre"' + (t.parentesco === 'padre' ? ' selected' : '') + '>Padre</option>' +
+        '<option value="madre"' + (t.parentesco === 'madre' ? ' selected' : '') + '>Madre</option>' +
+        '<option value="tutor"' + (t.parentesco === 'tutor' ? ' selected' : '') + '>Tutor</option></select></label></div>' +
+        '<div><label>Comentario del parentesco (ej. abuela, tío)<input class="t_det" maxlength="100" value="' + esc(t.parentesco_detalle || '') + '"></label></div>' +
+        '<div><label>Nombres<input class="t_nom" maxlength="100" value="' + esc(t.nombres || '') + '"></label></div>' +
+        '<div><label>Apellidos<input class="t_ape" maxlength="100" value="' + esc(t.apellidos || '') + '"></label></div>' +
+        '<div><label>Cédula<input class="t_ced" maxlength="20" value="' + esc(t.cedula || '') + '"></label></div>' +
+        '<div><label>Fecha de nacimiento<input class="t_fn" type="date" value="' + esc(t.fecha_nacimiento || '') + '"></label></div>' +
+        '</div><button class="peligro" data-quitar="' + i + '">Quitar</button></div>').join('')
+        : '<p class="peq">Todavía no has registrado a nadie.</p>';
+    }
+    function leerTutores() {
+      return [...document.querySelectorAll('#listaTutores .tutor')].map(el => ({
+        parentesco: el.querySelector('.t_par').value, parentesco_detalle: el.querySelector('.t_det').value.trim(),
+        nombres: el.querySelector('.t_nom').value.trim(), apellidos: el.querySelector('.t_ape').value.trim(),
+        cedula: el.querySelector('.t_ced').value.trim(), fecha_nacimiento: el.querySelector('.t_fn').value }));
+    }
+    async function enviarTutores() {
+      const lista = leerTutores();
+      if (!lista.length) { msg('Agrega al menos una persona', 'red'); return; }
+      for (const t of lista) {
+        if (!t.nombres || !t.apellidos) { msg('Cada persona necesita nombres y apellidos', 'red'); return; }
+        if (t.parentesco === 'tutor' && !t.parentesco_detalle) { msg('Escribe el parentesco del tutor (ej. abuela, tío)', 'red'); return; }
+        if (t.cedula && t.cedula.replace(/\D/g, '').length !== 11) { msg('La cédula debe tener 11 dígitos', 'red'); return; }
+      }
+      if (!confirm('Esto usa 1 de tus ediciones del mes. ¿Enviar a revisión?')) return;
+      const limpio = lista.map(t => { const o = {}; Object.keys(t).forEach(k => { if (t[k]) o[k] = t[k]; }); return o; });
+      $('btnTutores').disabled = true; msg('Enviando...');
+      const { error } = await cliente.from('solicitudes_cambio').insert({ perfil_id: ctx.uid, tipo: 'tutores', datos: { tutores: limpio } });
+      if (error) { msg(friendly(error), 'red'); $('btnTutores').disabled = false; return; }
+      msg('Enviado ✔ La secretaría lo revisará.', 'green');
+      recargar();
+    }
+
+    // ---------- Historial ----------
+    function dibujarHistorial(lista) {
+      $('historial').innerHTML = lista.length ? lista.map(s => {
+        const resumen = s.tipo === 'tutores' ? 'Datos de padres/tutores'
+          : Object.keys(s.datos).map(k => ETQ[k] || k).join(', ');
+        return '<div class="hist"><span class="etq ' + s.estado + '">' + s.estado + '</span> ' + esc(resumen) +
+          ' <span class="peq">' + new Date(s.creado_en).toLocaleDateString('es-DO') + '</span>' +
+          (s.estado === 'rechazada' && s.motivo_rechazo ? '<div class="peq">Motivo: ' + esc(s.motivo_rechazo) + '</div>' : '') + '</div>';
+      }).join('') : '<p class="peq">Todavía no has enviado solicitudes.</p>';
+    }
+
+    // ---------- Documentos ----------
+    async function dibujarDocs(docs) {
+      if (!docs.length) { $('listaDocs').innerHTML = '<p class="peq">No hay documentos.</p>'; return; }
+      const r = await cliente.storage.from('documentos').createSignedUrls(docs.map(x => x.ruta), 900);
+      const mapa = {};
+      (r.data || []).forEach(x => { if (x.signedUrl) mapa[x.path] = x.signedUrl; });
+      $('listaDocs').innerHTML = docs.map(x => '<div class="doc">' + (mapa[x.ruta] ? '<a href="' + esc(mapa[x.ruta]) +
+        '" target="_blank" rel="noopener"><img src="' + esc(mapa[x.ruta]) + '" alt=""></a>' : '') +
+        '<b>' + (TIPOS_DOC[x.tipo] || '') + '</b> <span class="etq ' + x.estado + '">' + x.estado + '</span>' +
+        (x.descripcion ? '<div class="peq">' + esc(x.descripcion) + '</div>' : '') +
+        (x.estado === 'rechazado' && x.motivo_rechazo ? '<div class="peq">Motivo: ' + esc(x.motivo_rechazo) + '</div>' : '') +
+        (directo && x.estado === 'pendiente' ? '<button class="peligro" data-borrar="' + x.id + '" data-ruta="' + esc(x.ruta) + '">Borrar</button>' : '') +
+        '</div>').join('');
+      $('listaDocs').querySelectorAll('[data-borrar]').forEach(b => b.addEventListener('click', async () => {
+        if (!confirm('¿Borrar esta imagen?')) return;
+        const d = await cliente.from('documentos_persona').delete().eq('id', b.dataset.borrar);
+        if (d.error) { msg('No se pudo borrar: ' + d.error.message, 'red'); return; }
+        await cliente.storage.from('documentos').remove([b.dataset.ruta]);
+        recargar();
+      }));
+    }
+
+    function reducir(archivo) {
+      return new Promise(res => {
+        const url = URL.createObjectURL(archivo), im = new Image();
+        im.onload = () => {
+          const k = Math.min(1, 1600 / Math.max(im.width, im.height)), c = document.createElement('canvas');
+          c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+          c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+          URL.revokeObjectURL(url);
+          c.toBlob(b => res(b || archivo), 'image/jpeg', 0.85);
+        };
+        im.onerror = () => { URL.revokeObjectURL(url); res(archivo); };
+        im.src = url;
+      });
+    }
+
+    async function subirDoc() {
+      if (!directo && !permisoVigente) { msg('Primero pide permiso a la secretaría.', 'red'); return; }
+      const f = $('s_archivo').files[0];
+      if (!f) { msg('Elige una imagen', 'red'); return; }
+      if (!/^image\/(jpeg|png|webp)$/.test(f.type)) { msg('Solo JPG, PNG o WEBP', 'red'); return; }
+      if (nDocs >= 15) { msg('Ya llegaste al máximo de imágenes', 'red'); return; }
+      $('btnSubir').disabled = true; msg('Subiendo...');
+      const blob = await reducir(f);
+      const ruta = ctx.uid + '/' + crypto.randomUUID() + '.jpg';
+      const up = await cliente.storage.from('documentos').upload(ruta, blob, { contentType: 'image/jpeg' });
+      if (up.error) { msg('No se pudo subir: ' + up.error.message, 'red'); $('btnSubir').disabled = false; return; }
+      const tipo = $('s_tipo').value, descripcion = $('s_desc').value.trim() || null;
+      let ins;
+      if (directo) {
+        // Igual que en v3 (el docente guarda su documento directamente)
+        ins = await cliente.from('documentos_persona').insert({ perfil_id: ctx.uid, tipo, descripcion, ruta });
+        // Si las reglas no lo permiten para este rol, se intenta con la función de sql/04
+        if (ins.error && rolAct !== 'profesor') {
+          const flags = (window.Diseno && Diseno.banderas) ? await Diseno.banderas(cliente) : {};
+          if (flags.v4_permisos_subida) ins = await cliente.rpc('registrar_documento_propio', { p_tipo: tipo, p_descripcion: descripcion, p_ruta: ruta });
+        }
+      } else {
+        ins = await cliente.rpc('registrar_documento_propio', { p_tipo: tipo, p_descripcion: descripcion, p_ruta: ruta });
+      }
+      $('btnSubir').disabled = false;
+      if (ins.error) {
+        await cliente.storage.from('documentos').remove([ruta]);
+        msg('No se pudo registrar: ' + friendly(ins.error), 'red'); return;
+      }
+      $('s_archivo').value = ''; $('s_desc').value = '';
+      msg('Imagen subida ✔ Queda pendiente de aprobación.', 'green');
+      recargar();
+    }
+
+    iniciar();
+  </script>
+  <script src="tema.js"></script>
+</body>
+</html>

@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <script src="tema-inicial.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Horarios - Administración</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: var(--tp-fondo, #f6efe4); margin: 0; padding: 20px; }
+    .caja { background: white; padding: 20px; border-radius: 12px; max-width: 1100px;
+            margin: 0 auto 16px; box-shadow: 0 6px 20px rgba(124, 45, 18,0.12);
+            border-top: 5px solid var(--tp-principal, #7c2d12); border-left: 6px solid var(--tp-principal, #7c2d12); box-sizing: border-box; }
+    h1, h2, h3 { color: var(--tp-principal, #7c2d12); margin-top: 0; }
+    select, input, button { padding: 8px; margin: 4px; border-radius: 6px; border: 1px solid #ccc;
+                            font-family: Arial, sans-serif; font-size: 14px; box-sizing: border-box; }
+    button { background: var(--tp-principal, #7c2d12); color: white; border: none; cursor: pointer; padding: 10px 16px; }
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.4; cursor: default; }
+    button.sec { background: #e2e8f0; color: #1e293b; }
+    button.peligro { background: #dc2626; }
+    .barra { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .chip { display: inline-block; background: var(--tp-suave, #fbf3e8); color: var(--tp-principal, #7c2d12); border: 1px solid var(--tp-borde, #e0c49a);
+            border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: bold;
+            text-transform: uppercase; letter-spacing: 0.06em; }
+    .desliza { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ddd; padding: 3px; font-size: 13px; text-align: center; }
+    th { background: var(--tp-principal, #7c2d12); color: white; padding: 6px; }
+    td input { margin: 0; width: 100%; min-width: 110px; }
+    td input[type=time] { min-width: 100px; }
+    td input:disabled { background: #f1f5f9; }
+    .peq { color: #475569; font-size: 13px; }
+    #estado { font-size: 14px; }
+  </style>
+  <link rel="stylesheet" href="diseno.css">
+</head>
+<body>
+
+  <div class="caja">
+    <div class="barra">
+      <div>
+        <span class="chip">Administración</span>
+        <h1>Horarios por curso</h1>
+        <p id="saludo">Cargando...</p>
+      </div>
+      <div>
+        <button class="sec" onclick="location.href='admin.html'">← Volver</button>
+        <button onclick="salir()">Cerrar sesión</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="caja">
+    <h2>Elegir curso</h2>
+    <label><b>Curso:</b> <select id="curso" onchange="cambiarCurso()"></select></label>
+    <p class="peq" id="info"></p>
+    <label class="peq">Copiar el horario de otro curso al editor:
+      <select id="copiarDe"></select></label>
+    <button class="sec" onclick="copiar()">Copiar al editor</button>
+  </div>
+
+  <div class="caja">
+    <h2>Armar el horario (lunes a sábado)</h2>
+    <p class="peq">Cada fila es un bloque de tiempo. Escribe la materia en cada día (puedes elegir de la lista o escribir
+      libre, por ejemplo "Matemática - Prof. López"). Para un receso o almuerzo, escribe el texto en
+      <b>Receso</b> y toda la fila queda como receso. Deja en blanco los días sin clase.</p>
+    <datalist id="listaMaterias"></datalist>
+    <div class="desliza">
+      <table>
+        <thead><tr><th>Inicio</th><th>Fin</th><th>Lunes</th><th>Martes</th><th>Miércoles</th>
+          <th>Jueves</th><th>Viernes</th><th>Sábado</th><th>Receso</th><th></th></tr></thead>
+        <tbody id="filas"></tbody>
+      </table>
+    </div>
+    <button class="sec" onclick="agregarFila()">+ Agregar bloque</button>
+    <hr style="border:none;border-top:1px solid #e2e8f0;margin:14px 0">
+    <button id="btnGuardar" onclick="guardar()">Guardar y publicar horario</button>
+    <button class="peligro" id="btnQuitar" onclick="quitar()">Quitar horario de este curso</button>
+    <span id="estado"></span>
+    <p class="peq">Al guardar, los alumnos de este curso y sus familias lo ven de inmediato en «Calendario».</p>
+  </div>
+
+    <script src="rol-activo.js"></script>
+    <script src="diseno.js"></script>
+  <script>Diseno.montar({grupo:"admin", pagina:"admin_horario.html"});</script>
+<script>
+    const SUPABASE_URL = 'https://twhdnaiwxpilrevngxkk.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_lEIcvZOVtVD9HIK8HFwRtg_ik68D5Ad';
+    const cliente = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let cursos = [];
+
+    function esc(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    function estado(msg, color) {
+      const e = document.getElementById('estado');
+      e.style.color = color || '#334155'; e.textContent = msg || '';
+    }
+
+    async function iniciar() {
+      const { data: { session } } = await cliente.auth.getSession();
+      if (!session) { location.href = 'index.html'; return; }
+      const { data: perfil } = await cliente.from('perfiles')
+        .select('nombre, apellido, rol').eq('id', session.user.id).single();
+      const _ex = await cliente.from('roles_adicionales').select('rol').eq('perfil_id', session.user.id);
+      const _roles = perfil ? [perfil.rol].concat((_ex.data || []).map(x => x.rol)) : [];
+      if (!perfil || (!_roles.includes('admin') && !_roles.includes('coordinador'))) {
+        // v3: sin alerta; vuelve al inicio del rol activo (o a elegir rol)
+        if (perfil && window.RolActivo && RolActivo.alInicio(_roles)) return;
+        alert('Esta página es solo para administración');
+        location.href = 'index.html'; return;
+      }
+      const visual = window.RolActivo
+        ? RolActivo.preparar({ perfil: perfil, roles: _roles }, 'admin_horario.html')
+        : null;
+      if (window.RolActivo && !visual) return;
+      const rolVista = visual ? visual.rol : (!_roles.includes('admin') ? 'coordinador' : 'admin');
+      document.getElementById('saludo').textContent = ((visual && visual.etiqueta) || (rolVista === 'admin' ? 'Administrador(a)' : 'Coordinador(a)')) + ': ' + perfil.nombre + ' ' + perfil.apellido;
+      if (visual) RolActivo.aplicarDiseno(visual, session.user.id);
+
+      const { data } = await cliente.from('cursos').select('id, grado, seccion').order('grado').order('seccion');
+      cursos = (data || []).map(c => ({ id: Number(c.id), nombre: c.grado + ' ' + c.seccion }));
+      const sel = document.getElementById('curso');
+      if (!cursos.length) { sel.add(new Option('No hay cursos', '')); return; }
+      cursos.forEach(c => sel.add(new Option(c.nombre, c.id)));
+      cambiarCurso();
+    }
+
+    function filaHTML(b) {
+      b = b || {};
+      const celdas = Array.isArray(b.celdas) ? b.celdas : [];
+      const receso = !!b.etiqueta;
+      let celdasHtml = '';
+      for (let i = 0; i < 6; i++) {
+        celdasHtml += '<td><input type="text" class="cel" list="listaMaterias" maxlength="80"' +
+          (receso ? ' disabled' : '') + ' value="' + esc(celdas[i] || '') + '"></td>';
+      }
+      return '<tr><td><input type="time" class="ini" value="' + esc(b.inicio || '') + '"></td>' +
+        '<td><input type="time" class="fin" value="' + esc(b.fin || '') + '"></td>' +
+        celdasHtml +
+        '<td><input type="text" class="eti" maxlength="40" placeholder="Ej. Recreo" value="' + esc(b.etiqueta || '') +
+        '" oninput="alternarReceso(this)"></td>' +
+        '<td><button class="peligro" onclick="quitarFila(this)" title="Quitar bloque">✕</button></td></tr>';
+    }
+
+    function alternarReceso(input) {
+      const tr = input.closest('tr');
+      const activo = input.value.trim() !== '';
+      tr.querySelectorAll('.cel').forEach(c => c.disabled = activo);
+    }
+    function agregarFila(b) {
+      document.getElementById('filas').insertAdjacentHTML('beforeend', filaHTML(b));
+    }
+    function quitarFila(btn) { btn.closest('tr').remove(); }
+
+    function pintarEditor(bloques) {
+      document.getElementById('filas').innerHTML = '';
+      if (!bloques.length) agregarFila();
+      bloques.forEach(b => agregarFila(b));
+    }
+
+    async function cambiarCurso() {
+      const id = Number(document.getElementById('curso').value);
+      if (!id) return;
+      estado('Cargando...');
+      const [m, h] = await Promise.all([
+        cliente.from('asignaturas').select('nombre').eq('curso_id', id)
+          .order('orden', { nullsFirst: false }).order('nombre'),
+        cliente.from('horarios').select('bloques, actualizado_en').eq('curso_id', id).maybeSingle()
+      ]);
+      const nombres = [...new Set((m.data || []).map(x => x.nombre))];
+      document.getElementById('listaMaterias').innerHTML =
+        nombres.map(n => '<option value="' + esc(n) + '"></option>').join('');
+
+      const copiar = document.getElementById('copiarDe');
+      copiar.innerHTML = '';
+      cursos.filter(c => c.id !== id).forEach(c => copiar.add(new Option(c.nombre, c.id)));
+
+      if (h.error) {
+        estado('No se pudo leer el horario: ' + h.error.message + '. Si sigue pasando, avisa a la administración de la plataforma.', 'red');
+        pintarEditor([]);
+        return;
+      }
+      const bloques = h.data && Array.isArray(h.data.bloques) ? h.data.bloques : [];
+      pintarEditor(bloques);
+      document.getElementById('info').textContent = h.data
+        ? 'Horario publicado. Última actualización: ' + new Date(h.data.actualizado_en).toLocaleString('es-DO')
+        : 'Este curso todavía no tiene horario publicado.';
+      document.getElementById('btnQuitar').disabled = !h.data;
+      estado('');
+    }
+
+    async function copiar() {
+      const origen = Number(document.getElementById('copiarDe').value);
+      if (!origen) return;
+      if (!confirm('Esto reemplaza lo que hay en el editor (no se guarda hasta que pulses "Guardar"). ¿Continuar?')) return;
+      const { data, error } = await cliente.from('horarios').select('bloques').eq('curso_id', origen).maybeSingle();
+      if (error) { estado('Error: ' + error.message, 'red'); return; }
+      if (!data || !Array.isArray(data.bloques) || !data.bloques.length) {
+        estado('Ese curso no tiene horario publicado', 'red'); return;
+      }
+      pintarEditor(data.bloques);
+      estado('Copiado al editor. Revísalo y pulsa "Guardar y publicar horario".', 'green');
+    }
+
+    function recoger() {
+      const res = [];
+      for (const tr of document.getElementById('filas').rows) {
+        const inicio = tr.querySelector('.ini').value;
+        const fin = tr.querySelector('.fin').value;
+        const etiqueta = tr.querySelector('.eti').value.trim();
+        const celdas = [...tr.querySelectorAll('.cel')].map(x => x.value.trim());
+        if (!inicio && !fin && !etiqueta && celdas.every(x => !x)) continue;   // fila vacía
+        if (!inicio || !fin) return { error: 'Cada bloque necesita hora de inicio y de fin' };
+        if (fin <= inicio) return { error: 'En el bloque de las ' + inicio + ' la hora de fin debe ser posterior' };
+        if (!etiqueta && celdas.every(x => !x))
+          return { error: 'El bloque de las ' + inicio + ' no tiene materias ni receso' };
+        res.push({ inicio, fin, etiqueta, celdas: etiqueta ? ['', '', '', '', '', ''] : celdas });
+      }
+      res.sort((a, b) => a.inicio.localeCompare(b.inicio));
+      return { bloques: res };
+    }
+
+    async function guardar() {
+      const id = Number(document.getElementById('curso').value);
+      if (!id) return;
+      const r = recoger();
+      if (r.error) { estado(r.error, 'red'); return; }
+      if (!r.bloques.length) { estado('Agrega al menos un bloque (o usa "Quitar horario")', 'red'); return; }
+      const btn = document.getElementById('btnGuardar');
+      btn.disabled = true;
+      estado('Guardando...');
+      const { error } = await cliente.from('horarios')
+        .upsert({ curso_id: id, bloques: r.bloques }, { onConflict: 'curso_id' });
+      btn.disabled = false;
+      if (error) {
+        estado('No se pudo guardar: ' + (error.message.includes('row-level security')
+          ? 'solo la administración puede publicar horarios.' : error.message), 'red');
+        return;
+      }
+      estado('Horario publicado ✔', 'green');
+      cambiarCurso();
+    }
+
+    async function quitar() {
+      const id = Number(document.getElementById('curso').value);
+      if (!id) return;
+      if (!confirm('¿Quitar el horario de este curso? Los alumnos dejarán de verlo.')) return;
+      const { error } = await cliente.from('horarios').delete().eq('curso_id', id);
+      if (error) { estado('No se pudo quitar: ' + error.message, 'red'); return; }
+      estado('Horario quitado', 'green');
+      cambiarCurso();
+    }
+
+    async function salir() {
+      await cliente.auth.signOut();
+      location.href = 'index.html';
+    }
+
+    iniciar();
+  </script>
+  <script src="tema.js"></script>
+</body>
+</html>

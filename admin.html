@@ -1,0 +1,1775 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <script src="tema-inicial.js"></script>
+  <script src="listado-alumnos.js" defer></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel del Administrador</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Librerías para el Boletín de notas (PDF y Excel) -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: var(--tp-fondo, #f6efe4); margin: 0; padding: 20px; }
+    .caja { background: white; padding: 20px; border-radius: 12px; max-width: 960px;
+            margin: 0 auto 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            box-sizing: border-box; }
+    h1, h2 { color: var(--tp-principal, #7c2d12); }
+    select, input, button { padding: 8px; margin: 4px; border-radius: 6px; border: 1px solid #ccc;
+                            font-family: Arial, sans-serif; font-size: 15px; }
+    button { background: var(--tp-principal, #7c2d12); color: white; border: none; cursor: pointer; }
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.4; cursor: default; }
+    button.peligro { background: #dc2626; }
+    textarea { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ccc;
+               box-sizing: border-box; font-family: Arial, sans-serif; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ddd; padding: 4px 6px; text-align: left; font-size: 14px; }
+    th { background: var(--tp-principal, #7c2d12); color: white; }
+    #tablaEst th:nth-child(1), #tablaEst td:nth-child(1) { width: 44px; text-align: center; }
+    #tablaEst th:nth-child(2), #tablaEst td:nth-child(2) { width: 118px; white-space: nowrap; }
+    input.numLista {
+      width: 38px; padding: 3px 2px; margin: 0; text-align: center; font-size: 13px;
+      box-sizing: border-box;
+    }
+    .celda-orden {
+      display: flex; align-items: center; gap: 4px; white-space: nowrap;
+    }
+    button.btn-orden {
+      padding: 3px 7px; margin: 0; font-size: 12px; line-height: 1.2; min-width: 28px;
+    }
+    .asa { cursor: grab; color: #64748b; user-select: none; font-size: 14px; }
+    tr.arrastrando { opacity: 0.45; }
+    tr.destino { background: var(--tp-suave2, #f3e0c6); }
+
+    /* Fichas de maestros (sección 2) */
+    #fichasMaestros {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+      margin-top: 12px;
+    }
+    .ficha-maestro {
+      background: #ffffff;
+      border: 1px solid #dbe3ef;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+      transition: box-shadow 0.18s ease, transform 0.18s ease;
+    }
+    .ficha-maestro:hover {
+      box-shadow: 0 8px 20px rgba(124, 45, 18, 0.14);
+      transform: translateY(-2px);
+    }
+    .ficha-maestro-cabecera {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .maestro-nombre-wrap { position: relative; flex: 1; min-width: 0; }
+    button.maestro-nombre {
+      background: none;
+      color: var(--tp-principal, #7c2d12);
+      border: none;
+      padding: 0;
+      margin: 0;
+      font-size: 1.05em;
+      font-weight: bold;
+      cursor: pointer;
+      text-align: left;
+    }
+    button.maestro-nombre:hover { opacity: 1; text-decoration: underline; }
+    .badge-total {
+      background: var(--tp-principal, #7c2d12);
+      color: white;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .grado-acordeon {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      margin-bottom: 6px;
+      background: white;
+    }
+    .grado-acordeon summary {
+      cursor: pointer;
+      padding: 8px 10px;
+      font-weight: bold;
+      color: var(--tp-principal, #7c2d12);
+      list-style: none;
+    }
+    .grado-acordeon summary::-webkit-details-marker { display: none; }
+    .grado-acordeon summary::before { content: '▶ '; font-size: 0.8em; }
+    .grado-acordeon[open] summary::before { content: '▼ '; }
+    .grado-secciones { padding: 0 10px 10px; }
+    .seccion-box {
+      background: #f1f5f9;
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin-top: 8px;
+    }
+    .seccion-box h4 {
+      margin: 0 0 6px;
+      color: #334155;
+      font-size: 0.95em;
+    }
+    .cotejo-materia {
+      display: flex;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 4px 0;
+      cursor: pointer;
+      font-size: 0.95em;
+    }
+    .cotejo-materia input { margin: 3px 0 0; }
+    .lo-da { color: #64748b; font-size: 0.9em; }
+    .sin-datos { color: #64748b; font-size: 0.9em; margin: 4px 0; }
+    .ficha-flotante {
+      display: none;
+      position: absolute;
+      left: 0;
+      top: calc(100% + 6px);
+      z-index: 30;
+      min-width: 240px;
+      max-width: 320px;
+      max-height: 280px;
+      overflow-y: auto;
+      background: white;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+      padding: 12px;
+      color: #1e293b;
+    }
+    .ficha-maestro:nth-child(even) .ficha-flotante { left: auto; right: 0; }
+    .maestro-nombre-wrap:hover .ficha-flotante,
+    .maestro-nombre-wrap.abierta .ficha-flotante { display: block; }
+    .ficha-flotante ul { margin: 6px 0; padding-left: 18px; }
+    .ficha-flotante .resumen-titulo { margin: 0; font-weight: bold; color: var(--tp-principal, #7c2d12); }
+    .ficha-flotante .resumen-total { margin: 8px 0 0; font-weight: bold; }
+    .ficha-flotante .resumen-vacio { margin: 0; color: #64748b; }
+    .ficha-maestro-acciones {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      margin: -2px 0 12px;
+    }
+    .ficha-maestro-acciones button {
+      margin: 0;
+      padding: 5px 9px;
+      font-size: 13px;
+    }
+    #seccionMaestros .subcaja { margin-bottom: 16px; }
+
+    /* Sección unificada: trabajar con un curso */
+    .caja-curso {
+      padding: 0;
+      overflow: visible;
+      border-top: 5px solid var(--tp-principal, #7c2d12);
+      border-left: 6px solid var(--tp-principal, #7c2d12);
+      box-shadow: 0 6px 20px rgba(124, 45, 18, 0.12);
+    }
+    .cabecera-curso {
+      position: relative;
+      top: auto;
+      z-index: auto;
+      background: #ffffff;
+      border-radius: 12px 12px 0 0;
+    }
+    /* Bloques en flujo normal: no se montan al hacer scroll */
+    #barraCursoFija {
+      position: relative;
+      z-index: auto;
+      background: #ffffff;
+      border-top: 5px solid var(--tp-principal, #7c2d12);
+      border-left: 6px solid var(--tp-principal, #7c2d12);
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      margin: 0 auto 16px;
+      max-width: 960px;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 0;
+    }
+    #barraCursoFija .cabecera-curso {
+      position: relative;
+      box-shadow: none;
+      border-radius: 12px;
+    }
+    #seccionEstudiantes .cabecera-curso {
+      border-bottom: 1px solid #e2e8f0;
+    }
+    /* Solo la lista de alumnos se desliza */
+    .lista-alumnos-scroll {
+      max-height: min(58vh, 560px);
+      overflow-y: auto;
+      overflow-x: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      margin-top: 10px;
+      background: #fff;
+    }
+    .lista-alumnos-scroll table { margin-top: 0; }
+    .lista-alumnos-scroll thead th {
+      position: relative;
+      top: auto;
+      z-index: auto;
+    }
+    .barra-curso {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      padding: 16px 20px 8px;
+    }
+    .curso-elige h2 { margin: 0 0 6px; }
+    .ayuda-curso {
+      margin: 0 0 10px;
+      color: #475569;
+      font-size: 0.95em;
+    }
+    .curso-badge-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+    }
+    .curso-activo-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #64748b;
+      font-weight: bold;
+    }
+    .badge-curso {
+      display: inline-block;
+      background: var(--tp-principal, #7c2d12);
+      color: #fff;
+      font-size: 1.75rem;
+      font-weight: bold;
+      line-height: 1.2;
+      padding: 12px 22px;
+      border-radius: 12px;
+      letter-spacing: 0.03em;
+      box-shadow: 0 4px 12px rgba(124, 45, 18, 0.28);
+      min-width: 88px;
+      text-align: center;
+    }
+    .badge-curso.vacio {
+      background: #94a3b8;
+      box-shadow: none;
+    }
+    .texto-curso-activo {
+      margin: 0;
+      padding: 0 20px 10px;
+      color: #334155;
+      font-size: 0.98em;
+    }
+    .pestanias {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      padding: 0 16px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    button.pestania {
+      background: transparent;
+      color: #334155;
+      border: none;
+      border-bottom: 3px solid transparent;
+      border-radius: 8px 8px 0 0;
+      margin: 0;
+      padding: 10px 16px;
+      font-weight: bold;
+    }
+    button.pestania:hover {
+      opacity: 1;
+      background: #f1f5f9;
+      color: var(--tp-principal, #7c2d12);
+    }
+    button.pestania.activa {
+      background: var(--tp-suave, #fbf3e8);
+      color: var(--tp-principal, #7c2d12);
+      border-bottom-color: var(--tp-principal, #7c2d12);
+    }
+    .panel-tab { display: none; padding: 16px 20px 20px; }
+    .panel-tab.activa { display: block; }
+    .subcaja {
+      background: var(--tp-papel, #fffaf3);
+      border: 1px solid #e2e8f0;
+      border-left: 4px solid var(--tp-principal, #7c2d12);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .subcaja h3 {
+      color: var(--tp-principal, #7c2d12);
+      margin: 0 0 10px;
+    }
+    .tabla-wrap { overflow-x: auto; }
+    .caja-header { padding: 16px 20px; }
+    .caja-header h1 { margin: 8px 0 6px; }
+    .barra-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .chip {
+      display: inline-block;
+      background: var(--tp-suave, #fbf3e8);
+      color: var(--tp-principal, #7c2d12);
+      border: 1px solid var(--tp-borde, #e0c49a);
+      border-radius: 999px;
+      padding: 4px 12px;
+      font-size: 12px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .cuerpo-seccion { padding: 16px 20px 20px; }
+    h3 { color: var(--tp-principal, #7c2d12); margin: 0 0 10px; }
+    @media (max-width: 700px) {
+      .barra-curso, .barra-header {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .curso-badge-wrap { align-items: flex-start; }
+      .badge-curso { font-size: 1.35rem; }
+      button.pestania { padding: 10px 12px; }
+    }
+  </style>
+  <link rel="stylesheet" href="diseno.css">
+</head>
+<body>
+
+  <div class="caja caja-curso caja-header">
+    <div class="barra-header">
+      <div>
+        <span class="chip">Administrador</span>
+        <h1>Panel del Administrador</h1>
+        <p id="saludo">Cargando...</p>
+      </div>
+      <div><button onclick="location.href='admin_personal.html'">Personal y roles</button><button onclick="location.href='admin_modulos.html'">Configuración</button><button onclick="salir()">Cerrar sesión</button></div>
+    </div>
+  </div>
+
+  <div class="caja caja-curso" id="barraCursoFija">
+    <div class="cabecera-curso">
+      <div class="barra-curso">
+        <div class="curso-elige">
+          <h2>Cursos y alumnos</h2>
+          <p class="ayuda-curso">Primero elige el curso. Luego puedes agregar varios alumnos a la vez, crear sus cuentas o descargar el boletín. Más abajo está la lista de alumnos de ese curso.</p>
+          <label for="curso"><b>Curso:</b></label>
+          <select id="curso" onchange="cargarCurso()"></select>
+        </div>
+        <div class="curso-badge-wrap">
+          <span class="curso-activo-label">Curso actual</span>
+          <span id="badgeCurso" class="badge-curso vacio">—</span>
+        </div>
+      </div>
+      <p id="textoCursoActivo" class="texto-curso-activo">Elige un curso para empezar.</p>
+      <div class="pestanias" role="tablist">
+        <button type="button" class="pestania activa" role="tab" data-tab="masa" aria-selected="true" onclick="mostrarPestania('masa')">Agregar varios</button>
+        <button type="button" class="pestania" role="tab" data-tab="cuentas" aria-selected="false" onclick="mostrarPestania('cuentas')">Cuentas</button>
+        <button type="button" class="pestania" role="tab" data-tab="boletin" aria-selected="false" onclick="mostrarPestania('boletin')">Boletín</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="caja caja-curso" id="seccionCurso">
+<div id="tab-masa" class="panel-tab activa" role="tabpanel">
+      <div class="subcaja">
+        <h3>Agregar varios alumnos a la vez</h3>
+        <p>Un alumno por línea: <b>nombre, apellido</b>. La matrícula se crea sola.<br>
+           Si quieres poner tú la matrícula: <b>matrícula, nombre, apellido</b></p>
+        <textarea id="listaAlumnos" aria-label="Lista de alumnos, uno por línea: nombre, apellido" rows="8"
+          placeholder="María, López&#10;Pedro, Martínez"></textarea>
+        <button onclick="agregarEnMasa()">Agregar todos</button>
+        <p id="msgMasa"></p>
+      </div>
+    </div>
+
+    <div id="tab-cuentas" class="panel-tab" role="tabpanel">
+      <div class="subcaja">
+        <h3>Cuentas para que los alumnos entren</h3>
+        <p>Crea de una vez el usuario de cada alumno que aún no tenga cuenta.
+           El alumno entra con su <b>primer nombre en minúscula</b> más los
+           <b>últimos 4 dígitos</b> de la matrícula (ejemplo: Juan con 26-0001 entra como <b>juan0001</b>).<br>
+           Si dejas la contraseña vacía, esa misma clave es su contraseña inicial.</p>
+        <input id="claveAlumnos" aria-label="Contraseña inicial de los alumnos (opcional)" type="text" placeholder="Contraseña inicial (opcional)">
+        <button onclick="crearCuentas(false)">Crear cuentas de este curso</button>
+        <button onclick="crearCuentas(true)">Crear cuentas de toda la escuela</button>
+        <p id="msgCuentas"></p>
+      </div>
+    </div>
+
+    <div id="tab-boletin" class="panel-tab" role="tabpanel">
+      <div class="subcaja">
+        <h3>Boletín de notas</h3>
+        <p>El PDF y el Excel se generan para el curso actual (el de la barra de arriba). Incluye todas las materias del curso.</p>
+        <label for="boletinAlumno"><b>Estudiante:</b></label>
+        <select id="boletinAlumno"></select>
+        <button onclick="descargarBoletinPDF()">Descargar PDF</button>
+        <button onclick="descargarBoletinExcel()">Descargar Excel</button>
+        <p id="msgBoletin"></p>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <div class="caja caja-curso" id="seccionEstudiantes">
+    <div class="cabecera-curso">
+      <div class="barra-curso">
+        <div class="curso-elige">
+          <h2>Alumnos del curso</h2>
+          <p class="ayuda-curso">Agrega un alumno, cambia su orden en la lista, muévelo a otro curso o bórralo.</p>
+        </div>
+        <div class="curso-badge-wrap">
+          <span class="curso-activo-label">Curso actual</span>
+          <span id="badgeCursoEst" class="badge-curso vacio">—</span>
+        </div>
+      </div>
+      <p id="textoCursoEst" class="texto-curso-activo">Elige un curso arriba para ver y agregar estudiantes.</p>
+      <div class="listado-descarga">
+        <button type="button" class="btn-listado sin-tema" id="btnDescargarListado" onclick="descargarListadoAlumnos()" aria-describedby="ayudaListado"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42l3.3 3.3V4a1 1 0 0 1 1-1zM5 19h14a1 1 0 1 1 0 2H5a1 1 0 1 1 0-2z"/></svg> Descargar listado de alumnos</button>
+        <p class="peq ayuda-listado" id="ayudaListado">Baja un archivo para Excel (CSV) con: No., matrícula, apellidos, nombres y curso. Tiene datos personales: guárdalo con cuidado.</p>
+        <p class="estado-listado" id="estadoListado" role="status" aria-live="polite"></p>
+      </div>
+    </div>
+    <div class="cuerpo-seccion">
+      <div class="subcaja">
+        <h3>Estudiantes del curso</h3>
+        <input id="nombre" placeholder="Nombre" aria-label="Nombre del alumno">
+        <input id="apellido" placeholder="Apellido" aria-label="Apellido del alumno">
+        <input id="matricula" aria-label="Matrícula (opcional)" placeholder="Matrícula (opcional)">
+        <button onclick="agregarEstudiante()">Agregar estudiante</button>
+        <button class="peligro" onclick="borrarTodos()">Borrar todos los alumnos</button>
+        <p id="msgEst"></p>
+        <div class="lista-alumnos-scroll">
+          <table>
+            <thead><tr><th>No.</th><th>Orden</th><th>Matrícula</th><th>Nombre</th><th>Apellido</th><th>Mover a</th><th></th></tr></thead>
+            <tbody id="tablaEst"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="caja caja-curso" id="seccionMaestros">
+    <div class="barra-curso">
+      <div class="curso-elige">
+        <h2>Materias y profesores</h2>
+        <p class="ayuda-curso">Estas fichas son de toda la escuela, no de un solo curso. Aquí puedes crear maestros (con su usuario y contraseña), ordenar sus fichas, quitarles las materias o eliminarlos. Abre un grado para ver las secciones A, B, C y D, y marca las materias que le corresponden. Al marcar o desmarcar se guarda solo. Toca el nombre del maestro para ver un resumen de lo que imparte.</p>
+      </div>
+    </div>
+    <div class="cuerpo-seccion">
+      <div class="subcaja">
+        <h3>Agregar maestro</h3>
+        <p>Crea el usuario y la contraseña con los que el maestro va a entrar.
+           Si escribes un usuario sin <b>@</b>, se le agrega <b>@profesores.liceo.do</b>
+           (ejemplo: <b>ana</b> queda como <b>ana@profesores.liceo.do</b>).<br>
+           El maestro debe iniciar sesión con ese <b>correo completo</b>
+           (por ejemplo ana@profesores.liceo.do), no solo con el usuario corto.
+           La contraseña debe tener al menos 6 caracteres.</p>
+        <input id="nombreMaestro" aria-label="Nombre del profesor" placeholder="Nombre" autocomplete="off">
+        <input id="apellidoMaestro" aria-label="Apellido del profesor" placeholder="Apellido" autocomplete="off">
+        <input id="correoMaestro" aria-label="Correo o usuario del profesor" placeholder="Correo o usuario (ej. ana o ana@colegio.com)" autocomplete="off">
+        <input id="claveMaestro" aria-label="Contraseña del profesor" type="password" placeholder="Contraseña" autocomplete="new-password">
+        <button type="button" onclick="crearMaestro()">Crear maestro</button>
+        <p id="msgCrearMaestro"></p>
+      </div>
+      <div class="subcaja">
+        <h3>Agregar varios</h3>
+        <p>Un maestro por línea: <b>nombre, apellido, correo, contraseña</b>.
+           Si el correo no tiene @, se le agrega @profesores.liceo.do.
+           Ellos entran con el correo completo que quede guardado.</p>
+        <textarea id="listaMaestros" aria-label="Lista de profesores, uno por línea: nombre, apellido, usuario, clave" rows="8"
+          placeholder="Ana, Pérez, ana, clave123&#10;Luis, Gómez, luis@colegio.com, clave456"></textarea>
+        <button type="button" onclick="crearMaestrosEnMasa()">Crear todos</button>
+        <p id="msgCrearMaestrosMasa"></p>
+      </div>
+      <p id="msgMat"></p>
+      <div id="fichasMaestros"><p>Cargando maestros...</p></div>
+    </div>
+  </div>
+
+    <script src="rol-activo.js"></script>
+    <script src="diseno.js"></script>
+  <script>Diseno.montar({grupo:"admin", pagina:"admin.html"});</script>
+<script>
+    const SUPABASE_URL = 'https://twhdnaiwxpilrevngxkk.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_lEIcvZOVtVD9HIK8HFwRtg_ik68D5Ad';
+    const cliente = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let profesores = [];
+    let listaCursos = [];
+    let alumnosCurso = [];   // alumnos del curso en el orden de la lista
+    let listaAsignaturas = [];
+
+
+    async function iniciar() {
+      const { data: { session } } = await cliente.auth.getSession();
+      if (!session) { location.href = 'index.html'; return; }
+
+      const { data: perfil } = await cliente
+        .from('perfiles').select('nombre, rol').eq('id', session.user.id).single();
+      const _ex = await cliente.from('roles_adicionales').select('rol').eq('perfil_id', session.user.id);
+      const _roles = perfil ? [perfil.rol].concat((_ex.data || []).map(x => x.rol)) : [];
+      if (!perfil || (!_roles.includes('admin') && !_roles.includes('coordinador'))) {
+        // v3: sin alerta; vuelve al inicio del rol activo (o a elegir rol)
+        if (perfil && window.RolActivo && RolActivo.alInicio(_roles)) return;
+        alert('Solo administración o coordinación puede entrar aquí');
+        location.href = 'index.html';
+        return;
+      }
+      const visual = window.RolActivo
+        ? RolActivo.preparar({ perfil: perfil, roles: _roles }, 'admin.html')
+        : null;
+      if (window.RolActivo && !visual) return;
+      document.getElementById('saludo').textContent = 'Hola, ' + perfil.nombre;
+      const rolVista = visual ? visual.rol : (!_roles.includes('admin') ? 'coordinador' : 'admin');
+      if (rolVista === 'coordinador') {   // coordinador: mismo panel, rótulos propios
+        document.querySelector('.chip').textContent = 'Coordinador(a)';
+        document.querySelector('h1').textContent = 'Panel de Coordinación';
+      }
+      if (visual) RolActivo.aplicarDiseno(visual, session.user.id);
+
+      const { data: cursos } = await cliente
+        .from('cursos').select('id, grado, seccion').order('grado').order('seccion');
+      const lista = document.getElementById('curso');
+      cursos.forEach(c => lista.add(new Option(c.grado + ' ' + c.seccion, c.id)));
+      listaCursos = cursos;
+
+      await cargarProfesores();
+
+      await cargarAsignaturas();
+      pintarFichasMaestros();
+
+      cargarCurso();
+    }
+
+    function actualizarCursoActivo() {
+      const sel = document.getElementById('curso');
+      const texto = document.getElementById('textoCursoActivo');
+      const textoEst = document.getElementById('textoCursoEst');
+      const opt = (sel && sel.selectedIndex >= 0) ? sel.options[sel.selectedIndex] : null;
+      const nombre = (opt && opt.text) ? opt.text : '';
+      document.querySelectorAll('.badge-curso').forEach(badge => {
+        badge.textContent = nombre || '—';
+        badge.classList.toggle('vacio', !nombre);
+      });
+      if (texto) {
+        texto.textContent = nombre
+          ? 'Estás trabajando con ' + nombre + '. Agregar varios, las cuentas y el boletín son de este curso.'
+          : 'Elige un curso para empezar.';
+      }
+      if (textoEst) {
+        textoEst.textContent = nombre
+          ? 'Estudiantes de ' + nombre + '. Aquí se agregan, ordenan, mueven o borran.'
+          : 'Elige un curso arriba para ver y agregar estudiantes.';
+      }
+    }
+
+    function mostrarPestania(id) {
+      document.querySelectorAll('.panel-tab').forEach(p => {
+        p.classList.toggle('activa', p.id === 'tab-' + id);
+      });
+      document.querySelectorAll('.pestania').forEach(b => {
+        const on = b.getAttribute('data-tab') === id;
+        b.classList.toggle('activa', on);
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+    }
+
+    async function cargarCurso() {
+      actualizarCursoActivo();
+      const cursoId = document.getElementById('curso').value;
+
+      const { data: est } = await cliente
+        .from('estudiantes').select('id, matricula, nombre, apellido, orden')
+        .eq('curso_id', cursoId)
+        .order('orden', { nullsFirst: false }).order('apellido').order('nombre');
+      alumnosCurso = est || [];
+      llenarSelectBoletin();  // lista de alumnos del boletín
+      const tEst = document.getElementById('tablaEst');
+      tEst.innerHTML = '';
+      (est || []).forEach((e, i) => {
+        const fila = tEst.insertRow();
+        fila.draggable = true;
+
+        // Si el arrastre empieza en un recuadro o botón, no mover la fila
+        fila.ondragstart = (ev) => {
+          if (ev.target.closest('input, select, button')) {
+            ev.preventDefault();
+            return;
+          }
+          ev.dataTransfer.setData('text/plain', String(i));
+          ev.dataTransfer.effectAllowed = 'move';
+          fila.classList.add('arrastrando');
+        };
+        fila.ondragend = () => {
+          fila.classList.remove('arrastrando');
+          document.querySelectorAll('#tablaEst tr').forEach(f => f.classList.remove('destino'));
+        };
+        fila.ondragover = (ev) => {
+          ev.preventDefault();
+          ev.dataTransfer.dropEffect = 'move';
+          fila.classList.add('destino');
+        };
+        fila.ondragleave = () => fila.classList.remove('destino');
+        fila.ondrop = (ev) => {
+          ev.preventDefault();
+          fila.classList.remove('destino');
+          const desde = Number(ev.dataTransfer.getData('text/plain'));
+          if (desde !== i) cambiarOrden(desde, i);
+        };
+
+        // Recuadro para escribir el número de lista
+        const cajaNum = document.createElement('input');
+        cajaNum.type = 'number';
+        cajaNum.className = 'numLista';
+        cajaNum.min = 1;
+        cajaNum.max = alumnosCurso.length;
+        cajaNum.value = i + 1;
+        cajaNum.title = 'Escribe el número de lista y presiona Enter';
+        cajaNum.onchange = () => irANumero(i, cajaNum.value);
+        fila.insertCell().appendChild(cajaNum);
+
+        // Asa para arrastrar + botones para subir o bajar
+        const celdaOrden = fila.insertCell();
+        celdaOrden.className = 'celda-orden';
+        const asa = document.createElement('span');
+        asa.className = 'asa';
+        asa.textContent = '☰';
+        asa.title = 'Arrastra la fila para cambiar el orden';
+        const btnSubir = document.createElement('button');
+        btnSubir.className = 'btn-orden';
+        btnSubir.textContent = '▲';
+        btnSubir.disabled = (i === 0);
+        btnSubir.onclick = () => cambiarOrden(i, i - 1);
+        const btnBajar = document.createElement('button');
+        btnBajar.className = 'btn-orden';
+        btnBajar.textContent = '▼';
+        btnBajar.disabled = (i === alumnosCurso.length - 1);
+        btnBajar.onclick = () => cambiarOrden(i, i + 1);
+        celdaOrden.appendChild(asa);
+        celdaOrden.appendChild(btnSubir);
+        celdaOrden.appendChild(btnBajar);
+
+        fila.insertCell().textContent = e.matricula;
+        fila.insertCell().textContent = e.nombre;
+        fila.insertCell().textContent = e.apellido;
+
+        // Lista para mover a otro curso + botón Mover
+        const celdaMover = fila.insertCell();
+        const destino = document.createElement('select');
+        listaCursos.forEach(c => destino.add(new Option(c.grado + ' ' + c.seccion, c.id)));
+        destino.value = cursoId;
+        const btnMover = document.createElement('button');
+        btnMover.textContent = 'Mover';
+        btnMover.onclick = () => moverAlumno(e, destino.value);
+        celdaMover.appendChild(destino);
+        celdaMover.appendChild(btnMover);
+
+        // Botón Borrar
+        const btnBorrar = document.createElement('button');
+        btnBorrar.textContent = 'Borrar';
+        btnBorrar.className = 'peligro';
+        btnBorrar.onclick = () => borrarAlumno(e);
+        fila.insertCell().appendChild(btnBorrar);
+      });
+
+    }
+
+    async function agregarEstudiante() {
+      const msg = document.getElementById('msgEst');
+      const matricula = document.getElementById('matricula').value.trim();
+      const nombre = document.getElementById('nombre').value.trim();
+      const apellido = document.getElementById('apellido').value.trim();
+      const cursoId = document.getElementById('curso').value;
+
+      if (!nombre || !apellido) {
+        msg.style.color = 'red';
+        msg.textContent = 'Llena nombre y apellido';
+        return;
+      }
+
+      const siguiente = alumnosCurso.length + 1;
+      const { data, error } = await cliente.from('estudiantes')
+        .insert({ matricula: matricula || null, nombre, apellido,
+                  curso_id: cursoId, orden: siguiente })
+        .select('matricula').single();
+
+      if (error) {
+        msg.style.color = 'red';
+        msg.textContent = error.code === '23505'
+          ? 'Esa matrícula ya existe'
+          : 'Error: ' + error.message;
+        return;
+      }
+
+      msg.style.color = 'green';
+      msg.textContent = 'Estudiante agregado con matrícula ' + data.matricula;
+      document.getElementById('matricula').value = '';
+      document.getElementById('nombre').value = '';
+      document.getElementById('apellido').value = '';
+      cargarCurso();
+    }
+
+    async function agregarEnMasa() {
+      const msg = document.getElementById('msgMasa');
+      const cursoId = document.getElementById('curso').value;
+      const texto = document.getElementById('listaAlumnos').value;
+
+      const alumnos = [];
+      const errores = [];
+      let n = alumnosCurso.length;
+      texto.split('\n').forEach((linea, i) => {
+        if (linea.trim() === '') return;
+        const partes = linea.split(/[,\t]/).map(p => p.trim()).filter(p => p !== '');
+        n += 1;
+        if (partes.length === 2) {
+          alumnos.push({ matricula: null, nombre: partes[0],
+                         apellido: partes[1], curso_id: cursoId, orden: n });
+        } else if (partes.length === 3) {
+          alumnos.push({ matricula: partes[0], nombre: partes[1],
+                         apellido: partes[2], curso_id: cursoId, orden: n });
+        } else {
+          n -= 1;
+          errores.push('Línea ' + (i + 1));
+        }
+      });
+
+      if (errores.length > 0) {
+        msg.style.color = 'red';
+        msg.textContent = 'Revisa estas líneas: ' + errores.join(', ');
+        return;
+      }
+      if (alumnos.length === 0) {
+        msg.style.color = 'red';
+        msg.textContent = 'La lista está vacía';
+        return;
+      }
+
+      const { error } = await cliente.from('estudiantes').insert(alumnos);
+      if (error) {
+        msg.style.color = 'red';
+        msg.textContent = error.code === '23505'
+          ? 'Alguna matrícula ya existe. No se guardó nada; corrígela y vuelve a intentar.'
+          : 'Error: ' + error.message;
+        return;
+      }
+
+      msg.style.color = 'green';
+      msg.textContent = alumnos.length + ' alumnos agregados ✔';
+      document.getElementById('listaAlumnos').value = '';
+      cargarCurso();
+    }
+
+    // Crea las cuentas de los alumnos que todavía no tienen
+    // (entran con su matrícula). Lo hace en grupos pequeños.
+    async function crearCuentas(todaLaEscuela) {
+      const msg = document.getElementById('msgCuentas');
+      const cursoId = document.getElementById('curso').value;
+      const clave = document.getElementById('claveAlumnos').value.trim();
+
+      if (!todaLaEscuela && !cursoId) {
+        msg.style.color = 'red';
+        msg.textContent = 'Elige un curso primero';
+        return;
+      }
+
+      const aviso = todaLaEscuela
+        ? 'Se creará una cuenta para cada alumno de la escuela que aún no tenga. ¿Continuar?'
+        : 'Se crearán las cuentas de los alumnos de este curso que aún no tengan. ¿Continuar?';
+      if (!confirm(aviso)) return;
+
+      msg.style.color = '#334155';
+      msg.textContent = 'Creando cuentas...';
+
+      let creados = 0, conectados = 0, errores = [];
+      while (true) {
+        const { data, error } = await cliente.rpc('crear_cuentas_alumnos', {
+          solo_curso_id: todaLaEscuela ? null : Number(cursoId),
+          clave_inicial: clave || null,
+          lote: 25
+        });
+        if (error) {
+          msg.style.color = 'red';
+          msg.textContent = 'Error: ' + error.message;
+          return;
+        }
+        const filas = data || [];
+        if (filas.length === 0) break;
+
+        const nCreado = filas.filter(x => x.resultado === 'creado').length;
+        const nConect = filas.filter(x => x.resultado === 'conectado').length;
+        creados += nCreado;
+        conectados += nConect;
+        filas.filter(x => x.resultado === 'error').forEach(x => {
+          errores.push((x.matricula || '?') + ': ' + x.detalle);
+        });
+
+        msg.textContent = 'Creando cuentas... ' + (creados + conectados) + ' listas';
+        if (nCreado + nConect === 0) break;
+      }
+
+      if (errores.length && creados + conectados === 0) {
+        msg.style.color = 'red';
+        msg.textContent = 'No se pudo crear ninguna cuenta. ' + errores.slice(0, 3).join(' | ');
+        return;
+      }
+      const partes = [];
+      if (creados) partes.push(creados + ' cuentas nuevas');
+      if (conectados) partes.push(conectados + ' que ya existían y se conectaron');
+      msg.style.color = 'green';
+      msg.textContent = partes.length
+        ? partes.join(' y ') + ' ✔'
+        : 'Todos los alumnos de esa lista ya tenían cuenta';
+      if (errores.length) {
+        msg.textContent += '. No se pudieron: ' + errores.slice(0, 5).join(' | ');
+      }
+    }
+
+    // Subir, bajar o soltar un alumno en otro lugar y guardar el nuevo orden
+    async function cambiarOrden(desde, hacia) {
+      const msg = document.getElementById('msgEst');
+      if (hacia < 0 || hacia >= alumnosCurso.length) return;
+      const lista = [...alumnosCurso];
+      const [alumno] = lista.splice(desde, 1);   // sacarlo de su lugar
+      lista.splice(hacia, 0, alumno);            // ponerlo en el nuevo lugar
+
+      // Guardar el número de orden de los que cambiaron
+      for (let j = 0; j < lista.length; j++) {
+        if (lista[j].orden !== j + 1) {
+          const { error } = await cliente.from('estudiantes')
+            .update({ orden: j + 1 }).eq('id', lista[j].id);
+          if (error) {
+            msg.style.color = 'red';
+            msg.textContent = 'Error: ' + error.message;
+            return;
+          }
+        }
+      }
+      msg.textContent = '';
+      cargarCurso();
+    }
+
+    // Escribir un número de lista para saltar a esa posición
+    async function irANumero(desde, valor) {
+      const msg = document.getElementById('msgEst');
+      const numero = Number(valor);
+      if (!Number.isInteger(numero) || numero < 1 || numero > alumnosCurso.length) {
+        msg.style.color = 'red';
+        msg.textContent = 'Escribe un número entre 1 y ' + alumnosCurso.length;
+        cargarCurso();
+        return;
+      }
+      await cambiarOrden(desde, numero - 1);
+    }
+
+    // Mover un alumno a otro curso
+    async function moverAlumno(alumno, nuevoCursoId) {
+      const msg = document.getElementById('msgEst');
+      if (nuevoCursoId === document.getElementById('curso').value) {
+        msg.style.color = 'red';
+        msg.textContent = 'Elige un curso diferente para moverlo';
+        return;
+      }
+      const { error } = await cliente.from('estudiantes')
+        .update({ curso_id: nuevoCursoId, orden: null }).eq('id', alumno.id);
+      msg.style.color = error ? 'red' : 'green';
+      msg.textContent = error ? 'Error: ' + error.message
+        : alumno.nombre + ' ' + alumno.apellido + ' fue movido de curso ✔';
+      cargarCurso();
+    }
+
+    // Borrar un alumno (pide confirmación)
+    async function borrarAlumno(alumno) {
+      const msg = document.getElementById('msgEst');
+      const seguro = confirm('¿Seguro que quieres borrar a ' + alumno.nombre + ' ' +
+        alumno.apellido + '? También se borrarán sus notas.');
+      if (!seguro) return;
+      const { error } = await cliente.from('estudiantes').delete().eq('id', alumno.id);
+      msg.style.color = error ? 'red' : 'green';
+      msg.textContent = error ? 'Error: ' + error.message
+        : alumno.nombre + ' ' + alumno.apellido + ' fue borrado';
+      cargarCurso();
+    }
+
+    // Borrar todos los alumnos del curso elegido (pide confirmación dos veces)
+    async function borrarTodos() {
+      const msg = document.getElementById('msgEst');
+      const cursoId = document.getElementById('curso').value;
+      const curso = listaCursos.find(c => String(c.id) === String(cursoId));
+      const nombreCurso = curso ? (curso.grado + ' ' + curso.seccion) : 'este curso';
+      const cantidad = alumnosCurso.length;
+
+      if (cantidad === 0) {
+        msg.style.color = 'red';
+        msg.textContent = 'No hay alumnos en ' + nombreCurso;
+        return;
+      }
+
+      const seguro = confirm('¿Seguro que quieres borrar a TODOS los ' + cantidad +
+        ' alumnos de ' + nombreCurso + '? También se borrarán sus notas.');
+      if (!seguro) return;
+
+      const otraVez = confirm('Última confirmación: se van a borrar ' + cantidad +
+        ' alumnos de ' + nombreCurso + '. Esta acción no se puede deshacer.');
+      if (!otraVez) return;
+
+      const { error } = await cliente.from('estudiantes').delete().eq('curso_id', cursoId);
+      msg.style.color = error ? 'red' : 'green';
+      msg.textContent = error ? 'Error: ' + error.message
+        : 'Se borraron los ' + cantidad + ' alumnos de ' + nombreCurso;
+      cargarCurso();
+    }
+
+    function escapeHtml(texto) {
+      return String(texto)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function nombreCompleto(prof) {
+      if (!prof) return '';
+      return ((prof.nombre || '') + ' ' + (prof.apellido || '')).trim();
+    }
+
+    function profesorPorId(id) {
+      return profesores.find(p => String(p.id) === String(id)) || null;
+    }
+
+    function nombreProfesorPorId(id) {
+      return nombreCompleto(profesorPorId(id));
+    }
+
+    function etiquetaCurso(curso) {
+      if (!curso) return '';
+      return curso.grado + ' ' + curso.seccion;
+    }
+
+    function gradosUnicos() {
+      const vistos = [];
+      (listaCursos || []).forEach(c => {
+        if (c.grado && !vistos.includes(c.grado)) vistos.push(c.grado);
+      });
+      return vistos;
+    }
+
+    function cursosDeGrado(grado) {
+      return (listaCursos || []).filter(c => c.grado === grado);
+    }
+
+    function asignaturasDeCurso(cursoId) {
+      return listaAsignaturas.filter(a => String(a.curso_id) === String(cursoId));
+    }
+
+    function asignacionesDe(profesorId) {
+      return listaAsignaturas.filter(a => a.profesor_id && String(a.profesor_id) === String(profesorId));
+    }
+
+    function textoResumen(profesorId) {
+      const lista = asignacionesDe(profesorId);
+      if (lista.length === 0) {
+        return '<p class="resumen-vacio">Todavía no imparte ninguna materia.</p>' +
+               '<p class="resumen-total">Total: 0 materias</p>';
+      }
+      const items = lista.map(a => {
+        const curso = (listaCursos || []).find(c => String(c.id) === String(a.curso_id));
+        const cursoTxt = etiquetaCurso(curso) || 'Curso';
+        return '<li>' + escapeHtml(a.nombre) + ' — ' + escapeHtml(cursoTxt) + '</li>';
+      }).join('');
+      const palabra = lista.length === 1 ? 'materia' : 'materias';
+      return '<p class="resumen-titulo">Materias que imparte</p><ul>' + items +
+             '</ul><p class="resumen-total">Total: ' + lista.length + ' ' + palabra + '</p>';
+    }
+
+    function recordarAbiertos() {
+      const grados = {};
+      const popups = {};
+      document.querySelectorAll('.ficha-maestro').forEach(ficha => {
+        const id = ficha.dataset.profesorId;
+        grados[id] = [];
+        ficha.querySelectorAll('details[open]').forEach(d => grados[id].push(d.dataset.grado));
+        if (ficha.querySelector('.maestro-nombre-wrap.abierta')) popups[id] = true;
+      });
+      return { grados, popups };
+    }
+
+    async function cargarAsignaturas() {
+      const { data, error } = await cliente
+        .from('asignaturas')
+        .select('id, nombre, curso_id, profesor_id, orden')
+        .order('orden', { nullsFirst: false }).order('nombre');
+      const msg = document.getElementById('msgMat');
+      if (error) {
+        msg.style.color = 'red';
+        msg.textContent = 'Error al leer materias: ' + error.message;
+        listaAsignaturas = [];
+        return;
+      }
+      listaAsignaturas = data || [];
+    }
+
+    const DOMINIO_PROFESORES = '@profesores.liceo.do';
+    let ordenMaestrosOcupado = false;
+
+    function correoMaestro(raw) {
+      let correo = String(raw || '').trim().toLowerCase();
+      if (!correo) return '';
+      if (!correo.includes('@')) {
+        correo = correo.replace(/\s+/g, '') + DOMINIO_PROFESORES;
+      }
+      return correo;
+    }
+
+    function textoErrorRpc(error) {
+      const t = (error && (error.message || error.details)) || String(error || 'Error desconocido');
+      if (/could not find the function|schema cache|does not exist/i.test(t)) {
+        return 'Esta función todavía no está activada en la base de datos; avisa a la administración de la plataforma. ' + t;
+      }
+      return t;
+    }
+
+    function ordenarListaProfesores(lista) {
+      return (lista || []).slice().sort((a, b) => {
+        const ao = (a.orden === null || a.orden === undefined) ? 1e9 : Number(a.orden);
+        const bo = (b.orden === null || b.orden === undefined) ? 1e9 : Number(b.orden);
+        if (ao !== bo) return ao - bo;
+        const an = ((a.nombre || '') + ' ' + (a.apellido || '')).trim();
+        const bn = ((b.nombre || '') + ' ' + (b.apellido || '')).trim();
+        return an.localeCompare(bn, 'es');
+      });
+    }
+
+    async function cargarProfesores() {
+      const { data: profs, error } = await cliente
+        .from('perfiles')
+        .select('id, nombre, apellido, orden')
+        .eq('rol', 'profesor')
+        .order('orden', { ascending: true, nullsFirst: false })
+        .order('nombre');
+      if (error) {
+        const { data: fallback } = await cliente
+          .from('perfiles')
+          .select('id, nombre, apellido')
+          .eq('rol', 'profesor')
+          .order('nombre');
+        profesores = ordenarListaProfesores(fallback || []);
+        return error;
+      }
+      profesores = ordenarListaProfesores(profs || []);
+      return null;
+    }
+
+    async function recargarMaestros() {
+      await cargarProfesores();
+      await cargarAsignaturas();
+      pintarFichasMaestros();
+    }
+
+    async function crearMaestroUno(nombre, apellido, correoRaw, clave) {
+      const correo = correoMaestro(correoRaw);
+      const { data, error } = await cliente.rpc('crear_maestro', {
+        p_nombre: nombre,
+        p_apellido: apellido,
+        p_correo: correo,
+        p_clave: clave
+      });
+      if (error) throw error;
+      return data;
+    }
+
+    async function crearMaestro() {
+      const nombre = document.getElementById('nombreMaestro').value.trim();
+      const apellido = document.getElementById('apellidoMaestro').value.trim();
+      const correoRaw = document.getElementById('correoMaestro').value.trim();
+      const clave = document.getElementById('claveMaestro').value;
+      const msg = document.getElementById('msgCrearMaestro');
+
+      if (!nombre || !apellido || !correoRaw || !clave) {
+        msg.style.color = 'red';
+        msg.textContent = 'Escribe nombre, apellido, correo (o usuario) y contraseña.';
+        return;
+      }
+      if (clave.length < 6) {
+        msg.style.color = 'red';
+        msg.textContent = 'La contraseña debe tener al menos 6 caracteres.';
+        return;
+      }
+
+      msg.style.color = '#334155';
+      msg.textContent = 'Creando maestro...';
+      try {
+        const data = await crearMaestroUno(nombre, apellido, correoRaw, clave);
+        const correo = (data && data.correo) || correoMaestro(correoRaw);
+        msg.style.color = 'green';
+        msg.textContent = 'Maestro creado ✔. Debe entrar con el correo: ' + correo;
+        document.getElementById('nombreMaestro').value = '';
+        document.getElementById('apellidoMaestro').value = '';
+        document.getElementById('correoMaestro').value = '';
+        document.getElementById('claveMaestro').value = '';
+        await recargarMaestros();
+      } catch (err) {
+        msg.style.color = 'red';
+        msg.textContent = 'Error: ' + textoErrorRpc(err);
+      }
+    }
+
+    async function crearMaestrosEnMasa() {
+      const msg = document.getElementById('msgCrearMaestrosMasa');
+      const lineas = document.getElementById('listaMaestros').value.split(/\r?\n/);
+      const filas = [];
+      const fallos = [];
+
+      lineas.forEach((linea, i) => {
+        const texto = linea.trim();
+        if (!texto) return;
+        const partes = texto.split(',').map(s => s.trim());
+        if (partes.length < 4 || !partes[0] || !partes[1] || !partes[2] || !partes[3]) {
+          fallos.push('Línea ' + (i + 1) + ': usa nombre, apellido, correo, contraseña');
+          return;
+        }
+        const clave = partes.slice(3).join(',').trim();
+        if (clave.length < 6) {
+          fallos.push('Línea ' + (i + 1) + ': la contraseña debe tener al menos 6 caracteres');
+          return;
+        }
+        filas.push({
+          nombre: partes[0],
+          apellido: partes[1],
+          correoRaw: partes[2],
+          clave: clave,
+          linea: i + 1
+        });
+      });
+
+      if (!filas.length && !fallos.length) {
+        msg.style.color = 'red';
+        msg.textContent = 'Escribe al menos un maestro (nombre, apellido, correo, contraseña).';
+        return;
+      }
+      if (!filas.length) {
+        msg.style.color = 'red';
+        msg.textContent = fallos.join(' | ');
+        return;
+      }
+
+      msg.style.color = '#334155';
+      msg.textContent = 'Creando maestros...';
+      let creados = 0;
+      const correos = [];
+      for (const fila of filas) {
+        try {
+          const data = await crearMaestroUno(fila.nombre, fila.apellido, fila.correoRaw, fila.clave);
+          creados += 1;
+          correos.push((data && data.correo) || correoMaestro(fila.correoRaw));
+          msg.textContent = 'Creando maestros... ' + creados + ' de ' + filas.length;
+        } catch (err) {
+          fallos.push('Línea ' + fila.linea + ' (' + fila.nombre + '): ' + textoErrorRpc(err));
+        }
+      }
+
+      if (creados) {
+        document.getElementById('listaMaestros').value = '';
+        await recargarMaestros();
+      }
+
+      if (creados && !fallos.length) {
+        msg.style.color = 'green';
+        msg.textContent = creados + (creados === 1 ? ' maestro creado ✔. ' : ' maestros creados ✔. ') +
+          'Entran con: ' + correos.join(', ');
+        return;
+      }
+      if (creados && fallos.length) {
+        msg.style.color = '#b45309';
+        msg.textContent = creados + ' creados. No se pudieron: ' + fallos.slice(0, 5).join(' | ');
+        return;
+      }
+      msg.style.color = 'red';
+      msg.textContent = 'No se pudo crear ningún maestro. ' + fallos.slice(0, 5).join(' | ');
+    }
+
+    async function eliminarMaestro(id) {
+      const prof = profesorPorId(id);
+      const nombre = nombreCompleto(prof) || 'este maestro';
+      if (!confirm('¿Eliminar a ' + nombre + '? Se borrará su usuario y se le quitarán las materias. Esta acción no se puede deshacer.')) {
+        return;
+      }
+      const msg = document.getElementById('msgMat');
+      msg.style.color = '#334155';
+      msg.textContent = 'Eliminando maestro...';
+      const { error } = await cliente.rpc('eliminar_maestro', { p_id: id });
+      if (error) {
+        msg.style.color = 'red';
+        msg.textContent = 'Error: ' + textoErrorRpc(error);
+        return;
+      }
+      msg.style.color = 'green';
+      msg.textContent = nombre + ' fue eliminado ✔';
+      await recargarMaestros();
+    }
+
+    async function quitarMateriasMaestro(id) {
+      const prof = profesorPorId(id);
+      const nombre = nombreCompleto(prof) || 'este maestro';
+      const n = asignacionesDe(id).length;
+      if (!confirm('¿Quitar todas las materias de ' + nombre + '?' +
+          (n ? ' Ahora imparte ' + n + (n === 1 ? ' materia' : ' materias') + '.' : '') +
+          ' El maestro no se elimina.')) {
+        return;
+      }
+      const msg = document.getElementById('msgMat');
+      msg.style.color = '#334155';
+      msg.textContent = 'Quitando materias...';
+      const { data, error } = await cliente.rpc('quitar_materias_maestro', { p_id: id });
+      if (error) {
+        msg.style.color = 'red';
+        msg.textContent = 'Error: ' + textoErrorRpc(error);
+        return;
+      }
+      const cantidad = data && (data.cantidad ?? data.count);
+      msg.style.color = 'green';
+      msg.textContent = cantidad != null
+        ? ('Se quitaron ' + cantidad + (Number(cantidad) === 1 ? ' materia' : ' materias') + ' a ' + nombre + ' ✔')
+        : ('Se quitaron las materias de ' + nombre + ' ✔');
+      await recargarMaestros();
+    }
+
+    async function moverMaestro(indice, hacia) {
+      const dest = indice + hacia;
+      if (ordenMaestrosOcupado || dest < 0 || dest >= profesores.length) return;
+      const lista = profesores.slice();
+      const item = lista.splice(indice, 1)[0];
+      lista.splice(dest, 0, item);
+      profesores = lista;
+      pintarFichasMaestros();
+
+      ordenMaestrosOcupado = true;
+      const msg = document.getElementById('msgMat');
+      const { error } = await cliente.rpc('guardar_orden_maestros', {
+        p_ids: lista.map(p => p.id)
+      });
+      ordenMaestrosOcupado = false;
+      if (error) {
+        msg.style.color = 'red';
+        msg.textContent = 'Error al guardar el orden: ' + textoErrorRpc(error);
+        await recargarMaestros();
+        return;
+      }
+      profesores = lista.map((p, i) => Object.assign({}, p, { orden: i + 1 }));
+      msg.style.color = 'green';
+      msg.textContent = 'Orden de maestros guardado ✔';
+    }
+
+    function pintarFichasMaestros() {
+      const cont = document.getElementById('fichasMaestros');
+      if (!cont) return;
+      const estado = recordarAbiertos();
+      cont.innerHTML = '';
+
+      if (!profesores.length) {
+        cont.innerHTML = '<p>No hay profesores registrados.</p>';
+        return;
+      }
+
+      const grados = gradosUnicos();
+      profesores.forEach((p, i) => {
+        cont.appendChild(crearFichaMaestro(p, grados, estado, i));
+      });
+    }
+
+    function crearFichaMaestro(profesor, grados, estado, indice) {
+      const ficha = document.createElement('div');
+      ficha.className = 'ficha-maestro';
+      ficha.dataset.profesorId = profesor.id;
+
+      const cab = document.createElement('div');
+      cab.className = 'ficha-maestro-cabecera';
+
+      const wrap = document.createElement('div');
+      wrap.className = 'maestro-nombre-wrap';
+      if (estado.popups[profesor.id]) wrap.classList.add('abierta');
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'maestro-nombre';
+      btn.textContent = nombreCompleto(profesor);
+      btn.setAttribute('aria-expanded', estado.popups[profesor.id] ? 'true' : 'false');
+
+      const flot = document.createElement('div');
+      flot.className = 'ficha-flotante';
+      flot.innerHTML = textoResumen(profesor.id);
+
+      wrap.appendChild(btn);
+      wrap.appendChild(flot);
+
+      btn.addEventListener('click', ev => {
+        ev.stopPropagation();
+        const ya = wrap.classList.contains('abierta');
+        document.querySelectorAll('.maestro-nombre-wrap.abierta').forEach(el => {
+          el.classList.remove('abierta');
+          const b = el.querySelector('.maestro-nombre');
+          if (b) b.setAttribute('aria-expanded', 'false');
+        });
+        if (!ya) {
+          wrap.classList.add('abierta');
+          btn.setAttribute('aria-expanded', 'true');
+        }
+      });
+
+      const badge = document.createElement('span');
+      badge.className = 'badge-total';
+      const n = asignacionesDe(profesor.id).length;
+      badge.textContent = n + (n === 1 ? ' materia' : ' materias');
+
+      cab.appendChild(wrap);
+      cab.appendChild(badge);
+      ficha.appendChild(cab);
+
+      const acciones = document.createElement('div');
+      acciones.className = 'ficha-maestro-acciones';
+
+      const btnSubir = document.createElement('button');
+      btnSubir.type = 'button';
+      btnSubir.className = 'btn-orden';
+      btnSubir.textContent = '▲';
+      btnSubir.title = 'Subir';
+      btnSubir.disabled = indice === 0;
+      btnSubir.addEventListener('click', () => moverMaestro(indice, -1));
+
+      const btnBajar = document.createElement('button');
+      btnBajar.type = 'button';
+      btnBajar.className = 'btn-orden';
+      btnBajar.textContent = '▼';
+      btnBajar.title = 'Bajar';
+      btnBajar.disabled = indice === profesores.length - 1;
+      btnBajar.addEventListener('click', () => moverMaestro(indice, 1));
+
+      const btnQuitar = document.createElement('button');
+      btnQuitar.type = 'button';
+      btnQuitar.textContent = 'Quitar materias';
+      btnQuitar.addEventListener('click', () => quitarMateriasMaestro(profesor.id));
+
+      const btnEliminar = document.createElement('button');
+      btnEliminar.type = 'button';
+      btnEliminar.className = 'peligro';
+      btnEliminar.textContent = 'Eliminar';
+      btnEliminar.addEventListener('click', () => eliminarMaestro(profesor.id));
+
+      acciones.appendChild(btnSubir);
+      acciones.appendChild(btnBajar);
+      acciones.appendChild(btnQuitar);
+      acciones.appendChild(btnEliminar);
+      ficha.appendChild(acciones);
+
+      if (grados.length === 0) {
+        const aviso = document.createElement('p');
+        aviso.className = 'sin-datos';
+        aviso.textContent = 'No hay cursos registrados.';
+        ficha.appendChild(aviso);
+        return ficha;
+      }
+
+      const abiertos = estado.grados[profesor.id] || [];
+      grados.forEach(grado => {
+        ficha.appendChild(crearAcordeonGrado(profesor, grado, abiertos.includes(grado)));
+      });
+      return ficha;
+    }
+
+    function crearAcordeonGrado(profesor, grado, abierto) {
+      const details = document.createElement('details');
+      details.className = 'grado-acordeon';
+      details.dataset.grado = grado;
+      if (abierto) details.open = true;
+
+      const summary = document.createElement('summary');
+      summary.textContent = grado;
+      details.appendChild(summary);
+
+      const wrap = document.createElement('div');
+      wrap.className = 'grado-secciones';
+
+      const secciones = cursosDeGrado(grado);
+      if (secciones.length === 0) {
+        const vacio = document.createElement('p');
+        vacio.className = 'sin-datos';
+        vacio.textContent = 'No hay secciones en este grado.';
+        wrap.appendChild(vacio);
+      } else {
+        secciones.forEach(curso => wrap.appendChild(crearCajaSeccion(profesor, curso)));
+      }
+      details.appendChild(wrap);
+      return details;
+    }
+
+    function crearCajaSeccion(profesor, curso) {
+      const caja = document.createElement('div');
+      caja.className = 'seccion-box';
+
+      const titulo = document.createElement('h4');
+      titulo.textContent = 'Sección ' + curso.seccion;
+      caja.appendChild(titulo);
+
+      const mats = asignaturasDeCurso(curso.id);
+      if (mats.length === 0) {
+        const vacio = document.createElement('p');
+        vacio.className = 'sin-datos';
+        vacio.textContent = 'Este curso no tiene materias.';
+        caja.appendChild(vacio);
+        return caja;
+      }
+
+      mats.forEach(m => caja.appendChild(crearCotejo(profesor, m)));
+      return caja;
+    }
+
+    function crearCotejo(profesor, materia) {
+      const label = document.createElement('label');
+      label.className = 'cotejo-materia';
+
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = !!(materia.profesor_id && String(materia.profesor_id) === String(profesor.id));
+
+      const nombre = document.createElement('span');
+      nombre.className = 'cotejo-nombre';
+      nombre.textContent = materia.nombre;
+
+      const nota = document.createElement('span');
+      nota.className = 'lo-da';
+      if (materia.profesor_id && String(materia.profesor_id) !== String(profesor.id)) {
+        const quien = nombreProfesorPorId(materia.profesor_id) || 'otro maestro';
+        nota.textContent = ' (lo da ' + quien + ')';
+      }
+
+      label.appendChild(cb);
+      label.appendChild(nombre);
+      label.appendChild(nota);
+
+      cb.addEventListener('change', () => alCambiarCotejo(materia.id, profesor, cb));
+      return label;
+    }
+
+    async function alCambiarCotejo(asignaturaId, profesor, cb) {
+      const msg = document.getElementById('msgMat');
+      const materia = listaAsignaturas.find(a => String(a.id) === String(asignaturaId));
+      if (!materia) {
+        cb.checked = !cb.checked;
+        return;
+      }
+
+      cb.disabled = true;
+
+      if (cb.checked) {
+        if (materia.profesor_id && String(materia.profesor_id) !== String(profesor.id)) {
+          const otro = nombreProfesorPorId(materia.profesor_id) || 'otro maestro';
+          const curso = (listaCursos || []).find(c => String(c.id) === String(materia.curso_id));
+          const cursoTxt = etiquetaCurso(curso);
+          const ok = confirm(
+            materia.nombre + (cursoTxt ? ' de ' + cursoTxt : '') +
+            ' ya la da ' + otro + '. ¿Se la quieres asignar a ' +
+            nombreCompleto(profesor) + '?'
+          );
+          if (!ok) {
+            cb.checked = false;
+            cb.disabled = false;
+            return;
+          }
+        }
+        const { error } = await cliente.from('asignaturas')
+          .update({ profesor_id: profesor.id }).eq('id', asignaturaId);
+        if (error) {
+          cb.checked = false;
+          cb.disabled = false;
+          msg.style.color = 'red';
+          msg.textContent = 'Error: ' + error.message;
+          return;
+        }
+        materia.profesor_id = profesor.id;
+        msg.style.color = 'green';
+        msg.textContent = materia.nombre + ' asignada a ' + nombreCompleto(profesor) + ' ✔';
+      } else {
+        if (!materia.profesor_id || String(materia.profesor_id) !== String(profesor.id)) {
+          cb.checked = false;
+          cb.disabled = false;
+          return;
+        }
+        const { error } = await cliente.from('asignaturas')
+          .update({ profesor_id: null }).eq('id', asignaturaId);
+        if (error) {
+          cb.checked = true;
+          cb.disabled = false;
+          msg.style.color = 'red';
+          msg.textContent = 'Error: ' + error.message;
+          return;
+        }
+        materia.profesor_id = null;
+        msg.style.color = 'green';
+        msg.textContent = materia.nombre + ' quedó sin profesor';
+      }
+
+      cb.disabled = false;
+      pintarFichasMaestros();
+    }
+
+    // ================= BOLETÍN DE NOTAS (PDF y Excel) =================
+    const NOMBRE_LICEO = 'Liceo Experimental María Mercedes López López';
+
+    // Llenar la lista de estudiantes del boletín
+    function llenarSelectBoletin() {
+      const lista = document.getElementById('boletinAlumno');
+      lista.innerHTML = '';
+      lista.add(new Option('Todo el curso', 'todos'));
+      alumnosCurso.forEach((a, i) => lista.add(new Option((i + 1) + '. ' + a.apellido + ', ' + a.nombre, a.id)));
+    }
+
+    function mensajeBoletin(texto, color) {
+      const m = document.getElementById('msgBoletin');
+      m.textContent = texto;
+      m.style.color = color;
+    }
+
+    // Quitar acentos, espacios y signos para el nombre del archivo
+    function limpiarNombre(texto) {
+      return String(texto).normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    }
+
+    function fechaHoy() {
+      return new Date().toLocaleDateString('es-DO', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+
+    // Nota que cuenta en un período: la RP si la P es menor de 70 y hay RP; si no, la P
+    function notaQueCuentaBoletin(r, p) {
+      const pNota = r['p' + p] ?? null;
+      const rp = r['rp' + p] ?? null;
+      if (pNota === null) return null;
+      if (pNota < 70 && rp !== null) return rp;
+      return pNota;
+    }
+
+    // Promedio de una competencia (PC) o null
+    function promedioCompetenciaBoletin(r) {
+      if (!r) return null;
+      const valores = [1, 2, 3, 4].map(p => notaQueCuentaBoletin(r, p)).filter(v => v !== null);
+      if (valores.length === 0) return null;
+      return valores.reduce((s, x) => s + Number(x), 0) / valores.length;
+    }
+
+    // Buscar todo lo necesario en la base de datos
+    async function cargarDatosBoletin() {
+      const cursoId = document.getElementById('curso').value;
+      if (!cursoId) { mensajeBoletin('Elige un curso primero', 'red'); return null; }
+      mensajeBoletin('Buscando las notas...', '#334155');
+
+      const { data: mats, error: e1 } = await cliente
+        .from('asignaturas').select('id, nombre').eq('curso_id', cursoId).order('orden', { nullsFirst: false }).order('nombre');
+      if (e1) { mensajeBoletin('Error al leer materias: ' + e1.message, 'red'); return null; }
+      if (!mats || mats.length === 0) { mensajeBoletin('Este curso no tiene materias', 'red'); return null; }
+
+      const { data: est, error: e2 } = await cliente
+        .from('estudiantes').select('id, matricula, nombre, apellido, orden')
+        .eq('curso_id', cursoId)
+        .order('orden', { nullsFirst: false }).order('apellido');
+      if (e2) { mensajeBoletin('Error al leer estudiantes: ' + e2.message, 'red'); return null; }
+      if (!est || est.length === 0) { mensajeBoletin('Este curso no tiene alumnos', 'red'); return null; }
+
+      // Las notas se leen por partes de 1000 (límite de Supabase)
+      const ids = mats.map(m => m.id);
+      let cal = [];
+      for (let desde = 0; ; desde += 1000) {
+        const { data, error } = await cliente.from('calificaciones').select('*')
+          .in('asignatura_id', ids).range(desde, desde + 999);
+        if (error) { mensajeBoletin('Error al leer notas: ' + error.message, 'red'); return null; }
+        cal = cal.concat(data || []);
+        if (!data || data.length < 1000) break;
+      }
+      if (cal.length === 0)
+        mensajeBoletin('Aviso: no se encontró ninguna nota. Si sabes que sí hay notas, puede faltar un permiso de la cuenta de administración; avisa a quien administra la plataforma.', '#b45309');
+
+      // notas[estudianteId][asignaturaId][competencia] = fila
+      const notas = {};
+      cal.forEach(n => {
+        notas[n.estudiante_id] = notas[n.estudiante_id] || {};
+        notas[n.estudiante_id][n.asignatura_id] = notas[n.estudiante_id][n.asignatura_id] || {};
+        notas[n.estudiante_id][n.asignatura_id][n.competencia] = n;
+      });
+
+      const curso = listaCursos.find(c => String(c.id) === String(cursoId));
+      const nombreCurso = curso ? curso.grado + ' ' + curso.seccion : '';
+      const elegido = document.getElementById('boletinAlumno').value;
+      let lista = est;
+      if (elegido && elegido !== 'todos') {
+        lista = est.filter(a => String(a.id) === elegido);
+        if (lista.length === 0) { mensajeBoletin('No se encontró el estudiante', 'red'); return null; }
+      }
+      return { mats, est, lista, notas, nombreCurso, todos: !elegido || elegido === 'todos', avisoVacio: cal.length === 0 };
+    }
+
+    // v4: competencia 1..4 de la base = Bloque 1..4 (pendiente de confirmar por la dirección)
+    const LEYENDA_BLOQUES = 'Bloque 1: Comunicativa. Bloque 2: Pensamiento Lógico, Creativo y Crítico; Resolución de Problemas. ' +
+      'Bloque 3: Científica y Tecnológica; Ambiental y de la Salud. Bloque 4: Ética y Ciudadana; Desarrollo Personal y Espiritual.';
+    // Promedio de cada bloque (1 a 4) y final de un alumno en una materia
+    function resultadoMateria(datos, alumno, materia) {
+      const porComp = (datos.notas[alumno.id] || {})[materia.id] || {};
+      const pcs = [1, 2, 3, 4].map(c => promedioCompetenciaBoletin(porComp[c]));
+      const conValor = pcs.filter(v => v !== null);
+      const fin = conValor.length === 0 ? null
+        : Math.round(conValor.reduce((s, x) => s + x, 0) / conValor.length);
+      return { pcs, fin };
+    }
+
+    // Promedio general = promedio de las finales de las materias, redondeado
+    function promedioGeneral(datos, alumno) {
+      const finales = datos.mats.map(m => resultadoMateria(datos, alumno, m).fin).filter(v => v !== null);
+      if (finales.length === 0) return null;
+      return Math.round(finales.reduce((s, x) => s + x, 0) / finales.length);
+    }
+
+    function nombreArchivoBoletin(datos, extension) {
+      const quien = datos.todos ? 'Curso' : datos.lista[0].apellido + ' ' + datos.lista[0].nombre;
+      return 'Boletin_' + limpiarNombre(datos.nombreCurso) + '_' + limpiarNombre(quien) + '.' + extension;
+    }
+
+    function mensajeListo(datos, texto) {
+      if (datos.avisoVacio) return;  // dejar visible el aviso de "no hay notas"
+      mensajeBoletin(texto, 'green');
+    }
+
+    // ---------- PDF ----------
+    async function descargarBoletinPDF() {
+      if (!window.jspdf) { mensajeBoletin('No cargó la librería de PDF. Revisa el internet.', 'red'); return; }
+      const datos = await cargarDatosBoletin();
+      if (!datos) return;
+      const doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: 'letter' });
+      const ROJO = [185, 28, 28];
+      const texto = v => v === null ? '—' : String(v);
+
+      datos.lista.forEach((a, k) => {
+        if (k > 0) doc.addPage();
+        doc.setFontSize(15); doc.setFont('helvetica', 'bold');
+        doc.text(NOMBRE_LICEO, 396, 40, { align: 'center' });
+        doc.setFontSize(13);
+        doc.text('Boletín de notas', 396, 60, { align: 'center' });
+        doc.setFontSize(11); doc.setFont('helvetica', 'normal');
+        doc.text('Estudiante: ' + a.apellido + ', ' + a.nombre, 40, 85);
+        doc.text('Matrícula: ' + (a.matricula ?? '—') + '     Curso: ' + datos.nombreCurso +
+          '     No.: ' + (datos.est.indexOf(a) + 1), 40, 101);
+        doc.text('Fecha: ' + fechaHoy(), 752, 85, { align: 'right' });
+
+        const filas = datos.mats.map(m => {
+          const r = resultadoMateria(datos, a, m);
+          return [m.nombre, ...r.pcs.map(pc => pc === null ? '—' : pc.toFixed(1)), texto(r.fin)];
+        });
+        const general = promedioGeneral(datos, a);
+        filas.push([{ content: 'Promedio general', colSpan: 5, styles: { halign: 'right', fontStyle: 'bold' } },
+          { content: texto(general), styles: { fontStyle: 'bold' } }]);
+
+        doc.autoTable({
+          startY: 118,
+          head: [['Materia', 'Bloque 1', 'Bloque 2', 'Bloque 3', 'Bloque 4', 'Calificación final']],
+          body: filas,
+          theme: 'grid',
+          styles: { fontSize: 11, halign: 'center', cellPadding: 5 },
+          headStyles: { fillColor: [30, 58, 138], textColor: 255 },
+          columnStyles: { 0: { halign: 'left', cellWidth: 250 } },
+          didParseCell: d => {
+            if (d.section !== 'body' || d.column.index === 0) return;
+            const crudo = d.cell.raw && d.cell.raw.content !== undefined ? d.cell.raw.content : d.cell.raw;
+            const v = parseFloat(crudo);
+            if (!Number.isNaN(v) && v < 70) { d.cell.styles.textColor = ROJO; d.cell.styles.fontStyle = 'bold'; }
+          }
+        });
+        // v4: qué significa cada bloque
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(60, 60, 60);
+        doc.text(doc.splitTextToSize(LEYENDA_BLOQUES, 712), 40, doc.lastAutoTable.finalY + 16);
+        doc.setTextColor(0, 0, 0);
+      });
+      doc.save(nombreArchivoBoletin(datos, 'pdf'));
+      mensajeListo(datos, 'PDF descargado ✔');
+    }
+
+    // ---------- Excel ----------
+    async function descargarBoletinExcel() {
+      if (!window.XLSX) { mensajeBoletin('No cargó la librería de Excel. Revisa el internet.', 'red'); return; }
+      const datos = await cargarDatosBoletin();
+      if (!datos) return;
+      const v = x => (x === null || x === undefined) ? '' : x;
+      const filas = [];
+
+      if (datos.todos) {
+        // Todo el curso: una fila por estudiante, una columna por materia (final)
+        filas.push(['No.', 'Matrícula', 'Estudiante', ...datos.mats.map(m => m.nombre), 'Promedio general']);
+        datos.est.forEach((a, i) => {
+          filas.push([i + 1, v(a.matricula), a.apellido + ', ' + a.nombre,
+            ...datos.mats.map(m => v(resultadoMateria(datos, a, m).fin)), v(promedioGeneral(datos, a))]);
+        });
+      } else {
+        // Un estudiante: una fila por materia
+        const a = datos.lista[0];
+        filas.push([NOMBRE_LICEO]);
+        filas.push(['Boletín de notas']);
+        filas.push(['Estudiante: ' + a.apellido + ', ' + a.nombre, 'Matrícula: ' + v(a.matricula)]);
+        filas.push(['Curso: ' + datos.nombreCurso, 'Fecha: ' + fechaHoy()]);
+        filas.push([]);
+        filas.push(['Materia', 'Bloque 1', 'Bloque 2', 'Bloque 3', 'Bloque 4', 'Final']);
+        datos.mats.forEach(m => {
+          const r = resultadoMateria(datos, a, m);
+          filas.push([m.nombre, ...r.pcs.map(pc => pc === null ? '' : Number(pc.toFixed(1))), v(r.fin)]);
+        });
+        filas.push(['Promedio general', '', '', '', '', v(promedioGeneral(datos, a))]);
+        filas.push([]);
+        filas.push([LEYENDA_BLOQUES]);
+      }
+      const hoja = XLSX.utils.aoa_to_sheet(filas);
+      const libro = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(libro, hoja, 'Boletin');
+      XLSX.writeFile(libro, nombreArchivoBoletin(datos, 'xlsx'));
+      mensajeListo(datos, 'Excel descargado ✔');
+    }
+
+    async function salir() {
+      await cliente.auth.signOut();
+      location.href = 'index.html';
+    }
+
+    document.addEventListener('click', function (ev) {
+      if (ev.target.closest('.maestro-nombre-wrap')) return;
+      document.querySelectorAll('.maestro-nombre-wrap.abierta').forEach(el => {
+        el.classList.remove('abierta');
+        const b = el.querySelector('.maestro-nombre');
+        if (b) b.setAttribute('aria-expanded', 'false');
+      });
+    });
+
+    iniciar();
+  </script>
+  <script>
+    /* v4.1.1: Descargar listado de alumnos (CSV). Solo usa lo que esta página ya cargó. */
+    function descargarListadoAlumnos() {
+      if (!window.DescargaListados) { alert('Falta el archivo listado-alumnos.js en la carpeta de la plataforma.'); return; }
+      DescargaListados.descargarAlumnos(alumnosCurso, {
+        curso: DescargaListados.textoCurso('curso'),
+        mensajeVacio: 'No hay alumnos en este curso para descargar. Elige un curso arriba.'
+      });
+    }
+  </script>
+  <script src="tema.js"></script>
+</body>
+</html>

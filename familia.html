@@ -1,0 +1,1234 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <script src="tema-inicial.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mis Calificaciones</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: var(--tp-fondo, #f6efe4); margin: 0; padding: 20px; }
+    .caja { background: white; padding: 20px; border-radius: 12px; max-width: 960px;
+            margin: 0 auto 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            box-sizing: border-box; }
+    h1, h2, h3 { color: var(--tp-principal, #7c2d12); }
+    select, input, button { padding: 8px; margin: 4px; border-radius: 6px; border: 1px solid #ccc;
+                            font-family: Arial, sans-serif; font-size: 15px; }
+    button { padding: 10px 16px; border: none; background: var(--tp-principal, #7c2d12); color: white; cursor: pointer; }
+    button:hover { opacity: 0.85; }
+    .desliza { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ddd; padding: 4px 6px; text-align: center; font-size: 14px; }
+    th { background: var(--tp-principal, #7c2d12); color: white; }
+    .izq { text-align: left; }
+    td.gris { background: #e5e7eb; }
+    td.pc { background: var(--tp-suave, #fbf3e8); font-weight: bold; }
+    .rojo { color: #b91c1c; font-weight: bold; }
+    .final { font-weight: bold; font-size: 17px; }
+    .leyenda { color: #475569; font-size: 14px; }
+    .caja-curso {
+      padding: 0;
+      overflow: visible;
+      border-top: 5px solid var(--tp-principal, #7c2d12);
+      border-left: 6px solid var(--tp-principal, #7c2d12);
+      box-shadow: 0 6px 20px rgba(124, 45, 18, 0.12);
+    }
+    .caja-header { padding: 16px 20px; }
+    .caja-header h1 { margin: 8px 0 6px; }
+    .barra-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .chip {
+      display: inline-block;
+      background: var(--tp-suave, #fbf3e8);
+      color: var(--tp-principal, #7c2d12);
+      border: 1px solid var(--tp-borde, #e0c49a);
+      border-radius: 999px;
+      padding: 4px 12px;
+      font-size: 12px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .barra-curso {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      padding: 16px 20px 8px;
+    }
+    .barra-curso h2 { margin: 0 0 6px; }
+    .cuerpo-seccion { padding: 16px 20px 20px; }
+    .subcaja {
+      background: var(--tp-papel, #fffaf3);
+      border: 1px solid #e2e8f0;
+      border-left: 4px solid var(--tp-principal, #7c2d12);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    #datosAlumno { color: #334155; margin: 0; }
+    #detalle .caja {
+      border-top: 5px solid var(--tp-principal, #7c2d12);
+      border-left: 6px solid var(--tp-principal, #7c2d12);
+      box-shadow: 0 6px 20px rgba(124, 45, 18, 0.12);
+    }
+    #detalle .caja h3 { margin-top: 0; }
+
+    /* Avisos */
+    .aviso { border: 1px solid #e2e8f0; border-left: 4px solid var(--tp-principal, #7c2d12); border-radius: 10px;
+             padding: 10px 14px; margin: 10px 0; background: var(--tp-papel, #fffaf3); }
+    .aviso.imp { border-left-color: #dc2626; background: #fef2f2; }
+    .aviso p { margin: 6px 0; font-size: 14px; }
+    .aviso .peq { color: #475569; font-size: 12px; }
+    .etq { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px;
+           font-weight: bold; background: #e2e8f0; margin-left: 6px; }
+    .etq.imp { background: #fee2e2; color: #b91c1c; }
+
+    /* Tareas */
+    .resumen-tareas { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+    .resumen-tareas div { flex: 1; min-width: 90px; text-align: center; background: var(--tp-papel, #fffaf3);
+                          border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px; font-size: 13px; }
+    .resumen-tareas b { display: block; font-size: 22px; color: var(--tp-principal, #7c2d12); }
+    .tarea-item { border: 1px solid #e2e8f0; border-left: 4px solid var(--tp-principal, #7c2d12); border-radius: 10px;
+                  padding: 10px 14px; margin: 8px 0; background: var(--tp-papel, #fffaf3); }
+    .tarea-item.vencida { border-left-color: #dc2626; background: #fef2f2; }
+    .tarea-item .peq { color: #475569; font-size: 13px; margin-top: 4px; }
+    .etq.nueva { background: #dcfce7; color: #166534; }
+    .resumen-tareas small { display: block; color: #475569; font-size: 12px; margin-top: 2px; }
+
+    .rejilla-materias { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+    .tarjeta-materia { background: #fff; padding-bottom: 14px; }
+    .tarjeta-materia h3 { margin: 12px 14px 6px; }
+    .tarjeta-materia .peq { margin: 0 14px 8px; color: #475569; font-size: 13px; }
+    .acciones-tarjeta { margin: 0 14px; }
+    .aviso-alcance { color: #475569; font-size: 14px; }
+    #cajaDetalleMateria .bloque-detalle { margin: 0 0 16px; }
+
+    /* Selector de materias */
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .pestania { background: #e2e8f0; color: #1e293b; border: 1px solid #cbd5e1; border-radius: 999px;
+                padding: 8px 14px; margin: 0; font-size: 14px; cursor: pointer; }
+    .pestania.activa { background: var(--tp-principal, #7c2d12); color: white; border-color: var(--tp-principal, #7c2d12); }
+
+    /* Aviso de tareas pendientes (se quita a los 10 segundos) */
+    .toast-tareas { position: fixed; top: 14px; right: 14px; z-index: 100; max-width: 340px;
+                    background: white; border: 1px solid #fde68a; border-left: 5px solid #d97706;
+                    border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.22);
+                    padding: 12px 34px 10px 14px; font-size: 14px; animation: entraToast 0.25s ease-out; }
+    .toast-tareas .t-titulo { margin: 6px 0 2px; color: #1e293b; }
+    .toast-tareas .t-cuando { color: #b45309; font-size: 13px; margin-bottom: 8px; }
+    .toast-tareas button:not(.cerrar) { margin: 6px 0 0; padding: 7px 12px; font-size: 13px; }
+    .toast-tareas .cerrar { position: absolute; top: 4px; right: 6px; background: none; border: none;
+                            font-size: 16px; padding: 2px 6px; margin: 0; cursor: pointer; color: #475569; }
+    .toast-tareas .barra-t { height: 3px; background: #d97706; margin-top: 10px; border-radius: 2px;
+                             animation: encogeToast 10s linear forwards; }
+    @keyframes encogeToast { from { width: 100%; } to { width: 0; } }
+    @keyframes entraToast { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+    @media (max-width: 700px) { .toast-tareas { left: 10px; right: 10px; max-width: none; } }
+
+    @media (max-width: 700px) {
+      .barra-header { flex-direction: column; align-items: stretch; }
+    }
+
+    /* v3: tareas dentro de cada materia (consultar y entregar en un solo lugar) */
+    details.tarea { border: 1px solid #e2e8f0; border-left: 4px solid var(--tp-principal, #7c2d12); border-radius: 10px;
+                    padding: 10px 14px; margin: 10px 0; background: var(--tp-papel, #fffaf3); }
+    details.tarea.vencida { border-left-color: #b91c1c; }
+    details.tarea > summary { cursor: pointer; font-weight: bold; min-height: 32px; }
+    .enc-tarea { font-size: 14px; color: #475569; margin: 10px 0 2px; }
+    .explicacion { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; margin: 8px 0; }
+    .contenido-rico { font-size: 15px; line-height: 1.5; word-wrap: break-word; text-align: left; }
+    .contenido-rico img { max-width: 100%; height: auto; border-radius: 6px; margin: 6px 0; }
+    .cuadro-resp { background: white; border: 2px solid #cbd5e1; border-radius: 12px; padding: 12px 14px; margin: 14px 0 4px; }
+    .cuadro-resp h5 { margin: 0 0 8px; color: var(--tp-principal, #7c2d12); font-size: 15px; }
+    details.op { background: var(--tp-papel, #fffaf3); border: 1px solid #e2e8f0; border-left: 4px solid var(--tp-principal, #7c2d12);
+                 border-radius: 10px; padding: 8px 12px; margin: 8px 0; }
+    details.op > summary { cursor: pointer; font-weight: bold; min-height: 32px; }
+    .campo-tarea { display: block; margin: 8px 0 4px; font-weight: bold; font-size: 14px; }
+    details.op textarea, details.op input[type=text], details.op input[type=url] { width: 100%; box-sizing: border-box; margin: 0 0 6px; }
+    .msg { padding: 6px 10px; border-radius: 8px; margin: 6px 0; font-size: 14px; text-align: left; }
+    .msg.prof { background: var(--tp-suave2, #f3e0c6); }
+    .msg.alum { background: #f1f5f9; }
+    .resultado { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px; margin: 8px 0; text-align: left; }
+    .etq.ok { background: #dcfce7; color: #166534; }
+    .etq.mal { background: #fee2e2; color: #b91c1c; }
+    .cuadros { display: flex; gap: 10px; flex-wrap: wrap; }
+    .cuadro { flex: 1; min-width: 100px; text-align: center; background: var(--tp-papel, #fffaf3); border: 1px solid #e2e8f0;
+              border-radius: 10px; padding: 10px; }
+    .cuadro b { display: block; font-size: 24px; color: var(--tp-principal, #7c2d12); }
+    table.horario td.hora { white-space: nowrap; font-weight: bold; background: var(--tp-papel, #fffaf3); }
+    table.horario td.hoy { background: var(--tp-suave, #fbf3e8); font-weight: bold; }
+    table.horario td.receso { background: #f1f5f9; color: #334155; font-style: italic; }
+    .atencion li { margin: 6px 0; }
+    @media print {
+      body { background: white; padding: 0; }
+      .caja { box-shadow: none; margin: 0 0 10px; page-break-inside: avoid; border: none; }
+      .caja-curso, #detalle .caja { box-shadow: none; border: none; }
+      .subcaja { box-shadow: none; }
+      .noImprimir, .chip, .toast-tareas { display: none; }
+      #detalle .caja { display: block !important; }
+      body.sin-descarga * { display: none !important; }
+      #cajaResumen, #cajaMaterias, #cajaDetalleMateria, #cajaHorario, #cajaAsist, #cajaAvisos { display: none !important; }
+      body:not(.sin-descarga) #cajaNotas:not([style*="none"]), body:not(.sin-descarga) #detalle { display: block !important; }
+    }
+  </style>
+  <link rel="stylesheet" href="diseno.css">
+</head>
+<body>
+
+  <div class="caja caja-curso caja-header">
+    <div class="barra-header">
+      <div>
+        <span class="chip">Alumno/Familia</span>
+        <h1>Mis Calificaciones</h1>
+        <p id="saludo">Cargando...</p>
+        <p id="datosAlumno"></p>
+      </div>
+      <div class="noImprimir">
+        <button id="btnImprimir" onclick="window.print()">Imprimir o guardar en PDF</button>
+        <button onclick="location.href='mis_datos.html'">Mis datos</button><button onclick="salir()">Cerrar sesión</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="caja caja-curso" id="cajaMaterias">
+    <div class="barra-curso">
+      <h2>Materias</h2>
+    </div>
+    <div class="cuerpo-seccion">
+      <p class="leyenda" id="leyendaMaterias">Cada materia tiene su color. Si ves la franja roja, hay tareas por entregar.</p>
+      <div id="rejillaMaterias" class="rejilla-materias"><p class="leyenda">Cargando materias...</p></div>
+    </div>
+  </div>
+
+  <div class="caja caja-curso" id="cajaDetalleMateria" hidden>
+    <div class="barra-curso">
+      <div style="width:100%">
+        <button type="button" class="sec" id="btnVolverMaterias">← Volver a materias</button>
+        <div class="diseno-cubierta detalle-cubierta" id="cubiertaDetalle" style="margin-top:10px"></div>
+        <h2 id="tituloDetalleMateria">Materia</h2>
+      </div>
+    </div>
+    <p id="estadoTareas" class="leyenda" role="status" aria-live="polite" style="margin:0 20px"></p>
+    <div class="cuerpo-seccion" id="cuerpoDetalleMateria"></div>
+  </div>
+
+  <div class="caja caja-curso" id="cajaResumen">
+    <div class="barra-curso">
+      <h2>Resumen</h2>
+    </div>
+    <div class="cuerpo-seccion" id="resumenRapido"><p class="leyenda">Cargando resumen...</p></div>
+  </div>
+
+  <div class="caja caja-curso noImprimir" id="cajaAvisos">
+    <div class="barra-curso">
+      <h2>Avisos</h2>
+    </div>
+    <div class="cuerpo-seccion" id="avisos"><p class="leyenda">Cargando avisos...</p></div>
+  </div>
+
+  <div class="caja caja-curso noImprimir" id="cajaCalendario" hidden>
+    <div class="barra-curso">
+      <h2>Fechas de entrega</h2>
+    </div>
+    <div class="cuerpo-seccion" id="calendario"><p class="leyenda">Cargando calendario...</p></div>
+  </div>
+
+  <div class="caja caja-curso noImprimir" id="cajaHorario" hidden>
+    <div class="barra-curso">
+      <h2>Horario de clases</h2>
+    </div>
+    <div class="cuerpo-seccion" id="horario"><p class="leyenda">Cargando horario...</p></div>
+  </div>
+
+  <div class="caja caja-curso noImprimir" id="cajaAsist" hidden>
+    <div class="barra-curso">
+      <h2>Asistencia</h2>
+    </div>
+    <div class="cuerpo-seccion">
+      <div class="cuadros" id="resumenAsist"><p class="leyenda">Cargando asistencia...</p></div>
+      <div id="detalleAsist"></div>
+    </div>
+  </div>
+
+  <div class="caja caja-curso" id="cajaNotas">
+    <div class="barra-curso">
+      <h2>Resumen de todas las materias</h2>
+    </div>
+    <div class="cuerpo-seccion">
+      <div class="subcaja">
+        <div class="desliza">
+          <table>
+            <caption id="capResumenNotas">Resumen de calificaciones por materia</caption>
+            <thead><tr><th class="izq" scope="col">Materia</th><th scope="col"><abbr title="Bloque 1: Comunicativa">Bloque 1</abbr></th><th scope="col"><abbr title="Bloque 2: Pensamiento Lógico, Creativo y Crítico; Resolución de Problemas">Bloque 2</abbr></th><th scope="col"><abbr title="Bloque 3: Científica y Tecnológica; Ambiental y de la Salud">Bloque 3</abbr></th><th scope="col"><abbr title="Bloque 4: Ética y Ciudadana; Desarrollo Personal y Espiritual">Bloque 4</abbr></th>
+              <th scope="col">Calificación final</th></tr></thead>
+            <tbody id="resumen"></tbody>
+          </table>
+        </div>
+        <p class="leyenda">Cada bloque muestra el promedio de sus competencias. Las notas menores de 70 se ven en rojo.</p>
+        <p class="leyenda"><b>Bloque 1:</b> Comunicativa. <b>Bloque 2:</b> Pensamiento Lógico, Creativo y Crítico; Resolución de Problemas.
+          <b>Bloque 3:</b> Científica y Tecnológica; Ambiental y de la Salud. <b>Bloque 4:</b> Ética y Ciudadana; Desarrollo Personal y Espiritual.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="caja caja-curso noImprimir" id="cajaFiltro" style="display:none">
+    <div class="barra-curso">
+      <h2>Calificaciones por materia</h2>
+    </div>
+    <div class="cuerpo-seccion">
+      <p class="leyenda" style="margin-top:0">Elige una materia para ver la nota de cada período (P), la recuperación (RP) y el promedio de cada bloque.</p>
+      <div class="chips" id="chips" role="group" aria-label="Elegir materia para ver su detalle"></div>
+    </div>
+  </div>
+
+  <div class="caja caja-curso" id="cajaSinNotas" style="display:none">
+    <div class="cuerpo-seccion">
+      <p class="leyenda" style="margin:0">🔒 Las calificaciones no están disponibles para esta cuenta en este momento.
+        Si crees que es un error, habla con la dirección del liceo.</p>
+    </div>
+  </div>
+
+  <div id="detalle"></div>
+
+      <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.7/dist/purify.min.js"></script>
+  <script src="rico.js"></script>
+  <script src="rol-activo.js"></script>
+    <script src="diseno.js"></script>
+  <script>Diseno.montar({grupo:"familia", pagina:"familia.html"});</script>
+<script>
+    const SUPABASE_URL = 'https://twhdnaiwxpilrevngxkk.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_lEIcvZOVtVD9HIK8HFwRtg_ik68D5Ad';
+    const cliente = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // v4: las 4 columnas guardadas (competencia 1 a 4) se muestran como 4 bloques.
+    // Pendiente de confirmar por la dirección (según el MINERD).
+    const COMPETENCIAS = [
+      [1, 'Bloque 1: Comunicativa'],
+      [2, 'Bloque 2: Pensamiento Lógico, Creativo y Crítico; Resolución de Problemas'],
+      [3, 'Bloque 3: Científica y Tecnológica; Ambiental y de la Salud'],
+      [4, 'Bloque 4: Ética y Ciudadana; Desarrollo Personal y Espiritual']
+    ];
+    const PERIODOS = [1, 2, 3, 4];
+
+    function esc(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    // ===== Resumen rápido (se completa a medida que llegan los datos) =====
+    const resumenDatos = { general: null, pendientes: null, proxima: null, asist: null };
+
+    // Permisos que la administración le dio o quitó al alumno (por defecto, todos)
+    const permisos = {
+      ver_notas: true, descargar_notas: true, ver_tareas: true,
+      entregar_tareas: true, comentar: true, ver_asistencia: true
+    };
+
+    const datosFamilia = { alumno: null, mats: [], notas: [], tareas: [], entregas: {}, coments: [], finales: {},
+      avisos: [], avisosCargados: false, materiaAbierta: null };
+    let perfilActual = null, rolVista = 'estudiante';
+    const abiertas = new Set();   // tareas y opciones desplegadas (se conservan al recargar la lista)
+    const esPadre = () => rolVista === 'padre';
+
+    function hoyStr() {
+      return fechaHoy();
+    }
+
+    async function asegurarAvisos() {
+      if (datosFamilia.promesaAvisos) await datosFamilia.promesaAvisos;
+      return datosFamilia.avisos;
+    }
+
+    const ICONO_ALERTA = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>';
+
+    // v4: color propio de cada materia, según su orden (paleta fija sin rojo)
+    function colorDeMateria(id) {
+      const mats = datosFamilia.mats || [];
+      const i = mats.findIndex(m => String(m.id) === String(id));
+      return (window.Diseno && Diseno.colorMateria) ? Diseno.colorMateria(i < 0 ? 0 : i) : '#334155';
+    }
+    function pendientesDe(idMateria) {
+      return (datosFamilia.tareas || []).filter(x => String(x.asignatura_id) === String(idMateria)).filter(x => {
+        const e = datosFamilia.entregas[x.id];
+        return !e || e.estado === 'pendiente';
+      });
+    }
+
+    function pintarTarjetasMaterias() {
+      const rejilla = document.getElementById('rejillaMaterias');
+      if (!rejilla) return;
+      const mats = datosFamilia.mats || [];
+      if (!mats.length) {
+        rejilla.innerHTML = '<p class="leyenda">Todavía no hay materias en este curso.</p>';
+        return;
+      }
+      rejilla.innerHTML = mats.map(m => {
+        let meta = '', franja = '';
+        if (permisos.ver_tareas) {
+          const deMat = (datosFamilia.tareas || []).filter(x => String(x.asignatura_id) === String(m.id));
+          const pend = pendientesDe(m.id).length;
+          meta = deMat.length ? (deMat.length === 1 ? '1 tarea en total' : deMat.length + ' tareas en total') : 'No se han asignado tareas';
+          if (pend) {
+            franja = '<div class="franja-pendiente">' + ICONO_ALERTA + '<span>' +
+              (pend === 1 ? 'Tarea pendiente' : pend + ' tareas pendientes') + '</span></div>';
+          }
+        }
+        return '<article class="tarjeta-materia v4" style="--materia:' + colorDeMateria(m.id) + '" data-materia-id="' + esc(m.id) + '">' +
+          '<div class="diseno-cubierta" data-cubierta="' + esc(m.id) + '"></div>' +
+          franja +
+          '<h3>' + esc(m.nombre) + '</h3>' +
+          (meta ? '<div class="peq">' + esc(meta) + '</div>' : '') +
+          '<div class="acciones-tarjeta"><button type="button" class="btn-entrar sin-tema" aria-label="Entrar a ' + esc(m.nombre) + '" onclick="abrirDetalleMateria(\'' + m.id + '\')">Entrar</button></div>' +
+          '</article>';
+      }).join('');
+      // Portada dibujada por materia; solo el alumno puede cambiarla (la familia solo la ve)
+      if (window.Diseno && Diseno.montarPortada) {
+        rejilla.querySelectorAll('[data-cubierta]').forEach(c => {
+          const m = mats.find(x => String(x.id) === c.dataset.cubierta);
+          if (m) Diseno.montarPortada(c, m.nombre, colorDeMateria(m.id), !esPadre());
+        });
+      }
+      const btnVolver = document.getElementById('btnVolverMaterias');
+      if (btnVolver && !btnVolver._ok) {
+        btnVolver._ok = true;
+        btnVolver.addEventListener('click', volverAMaterias);
+      }
+    }
+
+    function volverAMaterias() {
+      const det = document.getElementById('cajaDetalleMateria');
+      if (det) det.hidden = true;
+      const rej = document.getElementById('cajaMaterias');
+      if (rej) rej.hidden = false;
+      datosFamilia.materiaAbierta = null;
+      const primero = document.querySelector('#rejillaMaterias button');
+      if (primero) primero.focus();
+    }
+
+    function fmtFecha(f) { return f ? f.split('-').reverse().join('/') : 'Sin fecha límite'; }
+
+    function etiquetaTarea(t, en) {
+      if (en && en.estado === 'calificada')
+        return '<span class="etq ok">Calificada: ' + esc(en.calificacion) + '/' + esc(t.puntos) + '</span>';
+      if (en && en.estado === 'entregada') return '<span class="etq ok">Entregada</span>';
+      const vencida = t.fecha_limite && t.fecha_limite < fechaHoy();
+      return vencida ? '<span class="etq mal">Pendiente (vencida)</span>' : '<span class="etq">Pendiente</span>';
+    }
+
+    function etiquetaMsg(m) {
+      if (m.autor_rol === 'profesor') return 'Profesor';
+      if (m.autor_rol === 'admin') return 'Administración';
+      if (perfilActual && m.autor_rol === perfilActual.rol) return 'Tú';
+      return m.autor_rol === 'padre' ? 'Familia' : 'Alumno';
+    }
+
+    /* Una tarea con su respuesta. Misma lógica que tenía Mi Aula (entregas y comentarios). */
+    function htmlTarea(t) {
+      const en = datosFamilia.entregas[t.id];
+      const msgs = (datosFamilia.coments || []).filter(c => c.tarea_id === t.id);
+      const cerrada = en && en.estado === 'calificada';
+      const claveC = t.id + ':c', claveE = t.id + ':e';
+      const prof = t.profesor_nombre ? 'Prof. ' + t.profesor_nombre : '';
+      const vencida = !en && t.fecha_limite && t.fecha_limite < fechaHoy();
+      const idT = 'tarea-' + t.id;
+      let html = '<details class="tarea' + (vencida ? ' vencida' : '') + '" data-key="' + esc(t.id) + '"' + (abiertas.has(String(t.id)) ? ' open' : '') + '>' +
+        '<summary><span id="' + esc(idT) + '">' + esc(t.titulo) + '</span> ' + etiquetaTarea(t, en) + '</summary>' +
+        (prof ? '<div class="enc-tarea">' + esc(prof) + '</div>' : '') +
+        '<div class="explicacion">' +
+        ((window.Rico && Rico.render(t)) || '<p class="leyenda">Sin instrucciones adicionales.</p>') +
+        '<p class="leyenda">Entrega: ' + esc(fmtFecha(t.fecha_limite)) + (t.puntos != null ? ' · ' + esc(t.puntos) + ' puntos' : '') + '</p></div>';
+
+      html += '<div class="cuadro-resp"><h5>' + (esPadre() ? 'Respuesta del alumno' : 'Tu respuesta') + '</h5>';
+      if (cerrada) {
+        html += '<div class="resultado"><b>Nota: ' + esc(en.calificacion) + ' / ' + esc(t.puntos) + '</b>' +
+          (en.comentario_profesor ? '<br>Comentario del profesor: ' + esc(en.comentario_profesor) : '') + '</div>' +
+          '<p class="leyenda">Esta tarea ya fue calificada y no se puede modificar.</p>';
+      }
+      if (esPadre()) {
+        // Padre/tutor: solo consulta lo que entregó su hijo o hija. No hay botón de entregar.
+        if (en && (en.texto || en.enlace)) {
+          html += '<div class="msg alum">' + (en.texto ? esc(en.texto).replace(/\n/g, '<br>') : '') +
+            (en.enlace ? '<br>Enlace: ' + esc(en.enlace) : '') + '</div>';
+        } else if (!cerrada) {
+          html += '<p class="leyenda">El alumno todavía no ha entregado esta tarea.</p>';
+        }
+      }
+
+      html += '<details class="op" data-key="' + esc(claveC) + '"' + (abiertas.has(claveC) ? ' open' : '') + '><summary>Comentarios' +
+        (msgs.length ? ' (' + msgs.length + ')' : '') + '</summary>' +
+        (msgs.length ? msgs.map(m =>
+          '<div class="msg ' + (m.autor_rol === 'profesor' || m.autor_rol === 'admin' ? 'prof' : 'alum') + '">' +
+          '<b>' + etiquetaMsg(m) + ':</b> ' + esc(m.mensaje) +
+          '<br><span class="leyenda">' + new Date(m.creado_en).toLocaleString('es-DO') + '</span></div>').join('')
+          : '<p class="leyenda">Sin comentarios.</p>') +
+        (permisos.comentar
+          ? '<label class="campo-tarea" for="cm' + esc(t.id) + '">' + (esPadre() ? 'Comentario de la familia para el profesor' : 'Comentario o duda para el profesor') + '</label>' +
+            '<textarea id="cm' + esc(t.id) + '" rows="2"></textarea>' +
+            '<button type="button" class="sec" data-accion="comentar" data-tarea="' + esc(t.id) + '">Enviar comentario</button>'
+          : '<p class="leyenda">La administración desactivó los comentarios.</p>') +
+        '</details>';
+
+      if (!esPadre()) {
+        if (!cerrada && permisos.entregar_tareas) {
+          html += '<details class="op" data-key="' + esc(claveE) + '"' + (abiertas.has(claveE) ? ' open' : '') + '><summary>' +
+            (en && en.estado === 'entregada' ? 'Actualizar mi entrega <span class="etq ok">Ya entregada</span>' : 'Entregar tarea') + '</summary>' +
+            '<label class="campo-tarea" for="tx' + esc(t.id) + '">Tu respuesta</label>' +
+            '<textarea id="tx' + esc(t.id) + '" rows="4">' + esc(en ? en.texto : '') + '</textarea>' +
+            '<label class="campo-tarea" for="en' + esc(t.id) + '">Enlace (Drive, YouTube, etc.), opcional</label>' +
+            '<input type="url" inputmode="url" id="en' + esc(t.id) + '" value="' + esc(en ? en.enlace : '') + '">' +
+            '<button type="button" data-accion="entregar" data-tarea="' + esc(t.id) + '">' +
+            (en && en.estado === 'entregada' ? 'Actualizar entrega' : 'Entregar tarea') + '</button></details>';
+        } else if (!cerrada) {
+          html += '<p class="leyenda">La administración desactivó el envío de tareas.</p>';
+        }
+      }
+      return html + '</div></details>';
+    }
+
+    async function abrirDetalleMateria(id, enfocar, tareaId) {
+      await asegurarAvisos();
+      const m = (datosFamilia.mats || []).find(x => String(x.id) === String(id));
+      const det = document.getElementById('cajaDetalleMateria');
+      const cuerpo = document.getElementById('cuerpoDetalleMateria');
+      const titulo = document.getElementById('tituloDetalleMateria');
+      if (!m || !det || !cuerpo) return;
+      datosFamilia.materiaAbierta = String(m.id);
+      titulo.textContent = m.nombre;
+      // v4: el color y la portada de la materia también arriba del detalle
+      const color = colorDeMateria(m.id);
+      det.style.setProperty('--materia', color);
+      titulo.style.color = color;
+      const cub = document.getElementById('cubiertaDetalle');
+      if (cub && window.Diseno && Diseno.montarPortada) Diseno.montarPortada(cub, m.nombre, color, !esPadre());
+      if (tareaId) abiertas.add(String(tareaId));
+      let html = '';
+      if (esPadre()) {
+        html += '<p class="diseno-nota-familia">Información de ' + esc(nombreAlumno()) + '. Puedes consultar sus tareas y notas; las entregas las hace el alumno.</p>';
+      }
+      if (permisos.ver_tareas) {
+        const deMat = (datosFamilia.tareas || []).filter(x => String(x.asignatura_id) === String(m.id));
+        html += '<section class="bloque-detalle" aria-labelledby="hTareasMat"><h3 id="hTareasMat">Tareas de esta materia</h3>';
+        if (!deMat.length) html += '<p class="leyenda">No se han asignado tareas en esta materia.</p>';
+        else html += deMat.map(htmlTarea).join('');
+        html += '</section>';
+      }
+      if (permisos.ver_notas) {
+        html += '<section class="bloque-detalle" aria-labelledby="hNotasMat"><h3 id="hNotasMat">Calificaciones de esta materia</h3>';
+        const cajaNota = document.querySelector('#detalle .caja[data-mat="' + String(m.id) + '"]');
+        if (cajaNota) html += cajaNota.innerHTML.replace(/<h3[^>]*>[\s\S]*?<\/h3>/, '').replace(/ id="[^"]*"/g, '');
+        else html += '<p class="leyenda">No hay calificaciones registradas en esta materia.</p>';
+        html += '</section>';
+      }
+      const avisosCurso = (datosFamilia.avisos || []).filter(a => a.curso_id !== null);
+      const avisosLiceo = (datosFamilia.avisos || []).filter(a => a.curso_id === null);
+      html += '<section class="bloque-detalle" aria-labelledby="hAvisosMat"><h3 id="hAvisosMat">Avisos</h3>' +
+        '<p class="aviso-alcance">Estos avisos son del curso o del liceo; no están separados por materia.</p>';
+      const listaA = avisosCurso.concat(avisosLiceo);
+      if (!listaA.length) html += '<p class="leyenda">No hay avisos por ahora.</p>';
+      else html += listaA.map(htmlAviso).join('');
+      html += '</section>';
+      cuerpo.innerHTML = html;
+      cuerpo.querySelectorAll('details[data-key]').forEach(d =>
+        d.addEventListener('toggle', () => {
+          if (d.open) abiertas.add(d.dataset.key); else abiertas.delete(d.dataset.key);
+        }));
+      document.getElementById('cajaMaterias').hidden = true;
+      det.hidden = false;
+      // v4: abrir la materia marca como vistas sus tareas nuevas y los avisos
+      if (window.Diseno && Diseno.novedades) {
+        if (permisos.ver_tareas) Diseno.novedades.marcarVistos('tareas',
+          (datosFamilia.tareas || []).filter(x => String(x.asignatura_id) === String(m.id)).map(x => x.id));
+        Diseno.novedades.marcarVistos('avisos');
+      }
+      const tareaEl = tareaId ? cuerpo.querySelector('details[data-key="' + CSS.escape(String(tareaId)) + '"]') : null;
+      if (tareaEl) {
+        tareaEl.open = true;
+        const sum = tareaEl.querySelector('summary');
+        try { tareaEl.scrollIntoView({ block: 'center' }); } catch (e) {}
+        try { sum.focus({ preventScroll: true }); } catch (e) { sum.focus(); }
+      } else if (enfocar !== false) {
+        titulo.setAttribute('tabindex', '-1');
+        try { titulo.focus({ preventScroll: true }); } catch (e) { titulo.focus(); }
+        det.scrollIntoView({ block: 'start' });
+      }
+    }
+
+    // ===== v4: Calendario de entregas =====
+    const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    const DIAS_CORTOS = [['Lun', 'lunes'], ['Mar', 'martes'], ['Mié', 'miércoles'], ['Jue', 'jueves'], ['Vie', 'viernes'], ['Sáb', 'sábado'], ['Dom', 'domingo']];
+    const cal = { anio: null, mes: null, sel: null };
+    const dosDig = n => String(n).padStart(2, '0');
+
+    function nombreMateria(id) {
+      const m = (datosFamilia.mats || []).find(x => String(x.id) === String(id));
+      return m ? m.nombre : 'Materia';
+    }
+    function textoFechaLarga(f) {
+      const [a, me, d] = f.split('-').map(Number);
+      return d + ' de ' + MESES[me - 1] + ' de ' + a;
+    }
+
+    function pintarCalendario(enfocarDia) {
+      const cont = document.getElementById('calendario');
+      if (!cont) return;
+      if (!permisos.ver_tareas) {
+        cont.innerHTML = '<p class="leyenda">Las tareas no están disponibles para esta cuenta, por eso el calendario está vacío.</p>';
+        return;
+      }
+      const hoy = fechaHoy();
+      if (cal.anio === null) { cal.anio = Number(hoy.slice(0, 4)); cal.mes = Number(hoy.slice(5, 7)) - 1; cal.sel = hoy; }
+      const tareas = (datosFamilia.tareas || []);
+      const porDia = {};
+      tareas.forEach(t => { if (t.fecha_limite) (porDia[t.fecha_limite] = porDia[t.fecha_limite] || []).push(t); });
+
+      const primero = new Date(cal.anio, cal.mes, 1);
+      const diasMes = new Date(cal.anio, cal.mes + 1, 0).getDate();
+      const hueco = (primero.getDay() + 6) % 7;   // la semana empieza el lunes
+      let html = '<div class="cal-cabecera"><h3 id="calTitulo">' + MESES[cal.mes].charAt(0).toUpperCase() + MESES[cal.mes].slice(1) + ' ' + cal.anio + '</h3>' +
+        '<div class="cal-nav"><button type="button" class="sec" data-cal="-1" aria-label="Mes anterior">‹</button>' +
+        '<button type="button" class="sec" data-cal="hoy">Hoy</button>' +
+        '<button type="button" class="sec" data-cal="1" aria-label="Mes siguiente">›</button></div></div>';
+      html += '<table class="cal" aria-labelledby="calTitulo"><thead><tr>' +
+        DIAS_CORTOS.map(d => '<th scope="col"><abbr title="' + d[1] + '">' + d[0] + '</abbr></th>').join('') + '</tr></thead><tbody><tr>';
+      let celdas = 0;
+      for (let i = 0; i < hueco; i++) { html += '<td class="cal-fuera"></td>'; celdas++; }
+      const materiasDelMes = new Set();
+      for (let d = 1; d <= diasMes; d++) {
+        const f = cal.anio + '-' + dosDig(cal.mes + 1) + '-' + dosDig(d);
+        const lista = porDia[f] || [];
+        lista.forEach(t => materiasDelMes.add(String(t.asignatura_id)));
+        const nombres = [...new Set(lista.map(t => nombreMateria(t.asignatura_id)))];
+        const etiqueta = d + ' de ' + MESES[cal.mes] + (f === hoy ? ', hoy' : '') + ': ' +
+          (lista.length ? (lista.length === 1 ? '1 entrega' : lista.length + ' entregas') + ' (' + nombres.join(', ') + ')' : 'sin entregas');
+        const puntos = lista.slice(0, 4).map(t => '<i style="--punto:' + colorDeMateria(t.asignatura_id) + '"></i>').join('');
+        html += '<td><button type="button" class="cal-dia sin-tema' + (f === hoy ? ' hoy' : '') + (lista.length ? ' con-tareas' : '') +
+          '" data-fecha="' + f + '" aria-pressed="' + (f === cal.sel) + '" aria-label="' + esc(etiqueta) + '">' + d +
+          (puntos ? '<span class="cal-puntos" aria-hidden="true">' + puntos + '</span>' : '') + '</button></td>';
+        celdas++;
+        if (celdas % 7 === 0 && d < diasMes) html += '</tr><tr>';
+      }
+      while (celdas % 7 !== 0) { html += '<td class="cal-fuera"></td>'; celdas++; }
+      html += '</tr></tbody></table>';
+      if (materiasDelMes.size) {
+        html += '<ul class="cal-leyenda" aria-label="Colores de las materias">' + [...materiasDelMes].map(id =>
+          '<li><i style="--punto:' + colorDeMateria(id) + '" aria-hidden="true"></i>' + esc(nombreMateria(id)) + '</li>').join('') + '</ul>';
+      } else {
+        html += '<p class="leyenda">Este mes no hay fechas de entrega.</p>';
+      }
+      // Lista del día elegido
+      const delDia = cal.sel ? (porDia[cal.sel] || []) : [];
+      html += '<div role="region" aria-live="polite" aria-labelledby="calDiaTitulo"><h3 id="calDiaTitulo">' +
+        (cal.sel ? 'Entregas del ' + esc(textoFechaLarga(cal.sel)) : 'Elige un día') + '</h3>';
+      if (!delDia.length) html += '<p class="leyenda">No hay tareas que se entreguen este día. Toca otro día del calendario.</p>';
+      else html += '<ul class="cal-lista">' + delDia.map(t =>
+        '<li><span class="punto-m" style="--punto:' + colorDeMateria(t.asignatura_id) + '" aria-hidden="true"></span>' +
+        '<div><b>' + esc(t.titulo) + '</b><div class="peq">' + esc(nombreMateria(t.asignatura_id)) + ' · ' + etiquetaTarea(t, datosFamilia.entregas[t.id]) + '</div></div>' +
+        '<button type="button" class="cal-acc" data-abrir-tarea="' + esc(t.id) + '" data-materia="' + esc(t.asignatura_id) + '">' +
+        (esPadre() ? 'Ver la tarea' : 'Abrir la tarea') + '<span class="sr-only"> ' + esc(t.titulo) + '</span></button></li>').join('') + '</ul>';
+      html += '</div>';
+      const sinFecha = tareas.filter(t => !t.fecha_limite).length;
+      if (sinFecha) html += '<p class="leyenda">' + (sinFecha === 1 ? '1 tarea no tiene' : sinFecha + ' tareas no tienen') + ' fecha de entrega; la encuentras dentro de su materia.</p>';
+      cont.innerHTML = html;
+      if (enfocarDia) {
+        const b = cont.querySelector('[data-fecha="' + enfocarDia + '"]') || cont.querySelector('[data-cal="hoy"]');
+        if (b) b.focus();
+      }
+    }
+
+    document.addEventListener('click', ev => {
+      const dia = ev.target.closest('#calendario [data-fecha]');
+      if (dia) { cal.sel = dia.dataset.fecha; pintarCalendario(cal.sel); return; }
+      const nav = ev.target.closest('#calendario [data-cal]');
+      if (nav) {
+        if (nav.dataset.cal === 'hoy') {
+          const h = fechaHoy(); cal.anio = Number(h.slice(0, 4)); cal.mes = Number(h.slice(5, 7)) - 1; cal.sel = h;
+          pintarCalendario(h);
+        } else {
+          cal.mes += Number(nav.dataset.cal);
+          if (cal.mes < 0) { cal.mes = 11; cal.anio--; }
+          if (cal.mes > 11) { cal.mes = 0; cal.anio++; }
+          pintarCalendario();
+          const b = document.querySelector('#calendario [data-cal="' + nav.dataset.cal + '"]');
+          if (b) b.focus();
+        }
+        return;
+      }
+      const ab = ev.target.closest('#calendario [data-abrir-tarea]');
+      if (ab) irATarea(ab.dataset.materia, ab.dataset.abrirTarea);
+    });
+
+    function irATarea(materiaId, tareaId) {
+      if (window.Diseno && Diseno.mostrarSeccion) Diseno.mostrarSeccion('materias', false);
+      abrirDetalleMateria(materiaId, true, tareaId);
+    }
+
+    // Ver «Inicio» (donde están los avisos) cuenta como avisos vistos
+    document.addEventListener('diseno:seccion', ev => {
+      if (ev.detail && ev.detail.seccion === 'inicio' && datosFamilia.avisosCargados && window.Diseno && Diseno.novedades)
+        Diseno.novedades.marcarVistos('avisos');
+    });
+
+    function htmlAviso(a) {
+      const quien = a.autor_nombre
+        ? (a.autor_rol === 'admin' ? 'Administración' : esc(a.autor_nombre))
+        : '';
+      return '<div class="aviso' + (a.importante ? ' imp' : '') + '">' +
+        '<b>' + esc(a.titulo) + '</b>' +
+        (a.importante ? '<span class="etq imp">Importante</span>' : '') +
+        (a.curso_id === null ? '<span class="etq">Todo el liceo</span>' : '<span class="etq">Curso</span>') +
+        (window.Rico && Rico.renderTexto ? Rico.renderTexto(a.mensaje) : '<p>' + esc(a.mensaje).replace(/\n/g, '<br>') + '</p>') +
+        '<div class="peq">' + (quien ? quien + ' · ' : '') +
+        (a.creado_en ? new Date(a.creado_en).toLocaleDateString('es-DO') : '') + '</div></div>';
+    }
+
+    function estadoTareas(msg, tipo) {
+      const e = document.getElementById('estadoTareas');
+      if (!e) return;
+      e.style.color = tipo === 'error' ? '#b91c1c' : tipo === 'ok' ? '#15803d' : '#334155';
+      e.setAttribute('role', tipo === 'error' ? 'alert' : 'status');
+      e.textContent = msg || '';
+    }
+
+    // Entregar (misma operación que hacía Mi Aula: upsert en entregas)
+    async function entregarTarea(tareaId) {
+      if (esPadre() || !permisos.entregar_tareas) return;
+      const alumno = datosFamilia.alumno;
+      const texto = document.getElementById('tx' + tareaId).value.trim();
+      const enlace = document.getElementById('en' + tareaId).value.trim();
+      if (!texto && !enlace) {
+        estadoTareas('Escribe tu respuesta o pega un enlace antes de entregar.', 'error');
+        document.getElementById('tx' + tareaId).focus();
+        return;
+      }
+      estadoTareas('Enviando...');
+      const { error } = await cliente.from('entregas').upsert({
+        tarea_id: tareaId, estudiante_id: alumno.id,
+        texto: texto || null, enlace: enlace || null,
+        estado: 'entregada', entregado_en: new Date().toISOString()
+      }, { onConflict: 'tarea_id,estudiante_id' });
+      if (error) { estadoTareas('Error: ' + error.message, 'error'); return; }
+      estadoTareas('Tarea entregada ✔', 'ok');
+      await recargarTareas();
+    }
+
+    // Comentar (misma operación que hacía Mi Aula: insert en comentarios_tarea)
+    async function comentarTarea(tareaId) {
+      if (!permisos.comentar) return;
+      const alumno = datosFamilia.alumno;
+      const caja = document.getElementById('cm' + tareaId);
+      const mensaje = caja.value.trim();
+      if (!mensaje) { estadoTareas('Escribe el comentario antes de enviarlo.', 'error'); caja.focus(); return; }
+      const { error } = await cliente.from('comentarios_tarea').insert({
+        tarea_id: tareaId, estudiante_id: alumno.id,
+        autor_rol: perfilActual.rol, mensaje
+      });
+      if (error) { estadoTareas('Error: ' + error.message, 'error'); return; }
+      estadoTareas('Comentario enviado ✔', 'ok');
+      await recargarTareas();
+    }
+
+    async function recargarTareas() {
+      await cargarTareas(datosFamilia.alumno, datosFamilia.mats);
+      pintarTarjetasMaterias();
+      if (datosFamilia.materiaAbierta) await abrirDetalleMateria(datosFamilia.materiaAbierta, false);
+    }
+
+    document.addEventListener('click', ev => {
+      const b = ev.target.closest('[data-accion][data-tarea]');
+      if (!b) return;
+      const id = b.dataset.tarea;
+      if (b.dataset.accion === 'entregar') entregarTarea(id);
+      else if (b.dataset.accion === 'comentar') comentarTarea(id);
+    });
+
+    function nombreAlumno() {
+      const a = datosFamilia.alumno;
+      return a ? (a.nombre + ' ' + a.apellido) : 'el alumno';
+    }
+
+    async function cargarPermisos(alumno) {
+      const { data, error } = await cliente.from('permisos_estudiante')
+        .select('*').eq('estudiante_id', alumno.id).maybeSingle();
+      if (error) { console.warn('Permisos:', error.message); return; }
+      if (data) Object.keys(permisos).forEach(k => { if (typeof data[k] === 'boolean') permisos[k] = data[k]; });
+    }
+
+    function aplicarPermisosUI() {
+      if (!permisos.ver_notas) {
+        document.getElementById('cajaNotas').style.display = 'none';
+        document.getElementById('cajaSinNotas').style.display = '';
+      }
+      if (!permisos.ver_notas || !permisos.descargar_notas) {
+        document.getElementById('btnImprimir').style.display = 'none';
+      }
+      if (permisos.ver_notas && !permisos.descargar_notas) {
+        document.body.classList.add('sin-descarga');   // la impresión sale en blanco
+      }
+      if (!permisos.ver_asistencia) {
+        document.getElementById('resumenAsist').innerHTML = '';
+        document.getElementById('detalleAsist').innerHTML =
+          '<p class="leyenda">La administración desactivó la vista de asistencia para esta cuenta.</p>';
+      }
+      if (!permisos.ver_tareas) {
+        const ley = document.getElementById('leyendaMaterias');
+        if (ley) ley.textContent = 'Entra a cada materia para ver sus calificaciones y los avisos del curso. La administración desactivó la vista de tareas.';
+      }
+    }
+
+    function pintarResumen() {
+      const r = resumenDatos;
+      const v = x => (x === null || x === undefined ? '—' : x);
+      const a = r.asist;
+      const fmt = f => f.split('-').reverse().join('/');
+      const tarjetas = [];
+      const tarjeta = (cifra, rotulo, extra, alerta) =>
+        '<div class="diseno-tarjeta"><span class="cifra' + (alerta ? ' alerta' : '') + '">' + cifra + '</span>' +
+        '<span class="rotulo">' + rotulo + '</span>' + (extra ? '<span class="leyenda">' + extra + '</span>' : '') + '</div>';
+      if (permisos.ver_notas)
+        tarjetas.push(tarjeta(v(r.general), 'Promedio general', r.general !== null && r.general < 70 ? 'Por debajo de 70' : '', r.general !== null && r.general < 70));
+      if (permisos.ver_tareas)
+        tarjetas.push(tarjeta(v(r.pendientes), 'Tareas pendientes',
+          r.vencidas ? r.vencidas + (r.vencidas === 1 ? ' vencida' : ' vencidas') :
+          (r.proxima ? 'Próxima entrega: ' + fmt(r.proxima) : (r.pendientes === null ? '' : 'Sin entregas próximas')), !!r.vencidas));
+      if (permisos.ver_asistencia)
+        tarjetas.push(
+          tarjeta(v(a ? a.ausente : null), 'Ausencias', a ? 'Presente ' + a.presente + ' de ' + a.total + ' días' : '', a && a.ausente > 0) +
+          tarjeta(v(a ? a.tardanza : null), 'Tardanzas') +
+          tarjeta(v(a ? a.excusa : null), 'Excusas'));
+      const caja = document.getElementById('cajaResumen');
+      if (!tarjetas.length) {
+        document.getElementById('resumenRapido').innerHTML = '<p class="leyenda">La administración desactivó las vistas de esta cuenta.</p>';
+        return;
+      }
+      // Materias que necesitan atención: nota final < 70 o tareas vencidas sin entregar
+      const hoy = fechaHoy();
+      const atencion = (datosFamilia.mats || []).map(m => {
+        const motivos = [];
+        const fin = datosFamilia.finales[m.id];
+        if (permisos.ver_notas && fin !== undefined && fin !== null && fin < 70) motivos.push('nota final ' + fin);
+        if (permisos.ver_tareas) {
+          const venc = (datosFamilia.tareas || []).filter(t => String(t.asignatura_id) === String(m.id) &&
+            !datosFamilia.entregas[t.id] && t.fecha_limite && t.fecha_limite < hoy).length;
+          if (venc) motivos.push(venc === 1 ? '1 tarea vencida' : venc + ' tareas vencidas');
+        }
+        return { m, motivos };
+      }).filter(x => x.motivos.length);
+      let html = '<div class="diseno-tarjetas">' + tarjetas.join('') + '</div>';
+      html += '<h3>' + (esPadre() ? 'Materias de ' + esc(nombreAlumno()) + ' que necesitan atención' : 'Materias que necesitan atención') + '</h3>';
+      html += atencion.length
+        ? '<ul class="diseno-lista-simple atencion">' + atencion.map(x =>
+            '<li><b>' + esc(x.m.nombre) + '</b>: ' + esc(x.motivos.join(' y ')) + '. ' +
+            '<button type="button" class="diseno-enlace-texto sin-tema" onclick="irAMateria(\'' + x.m.id + '\')">Ver la materia ' + esc(x.m.nombre) + '</button></li>').join('') + '</ul>'
+        : '<p class="leyenda">Ninguna por ahora: no hay notas finales por debajo de 70 ni tareas vencidas.</p>';
+      if (permisos.ver_tareas && !esPadre())
+        html += '<p class="leyenda">Las tareas se consultan y se entregan dentro de cada materia.</p>';
+      document.getElementById('resumenRapido').innerHTML = html;
+    }
+
+    function irAMateria(id) {
+      if (window.Diseno && Diseno.mostrarSeccion) Diseno.mostrarSeccion('materias', false);
+      abrirDetalleMateria(id);
+    }
+
+    async function cargarAsistencia(alumno) {
+      const { data, error } = await cliente.from('asistencias')
+        .select('fecha, estado, observacion').eq('estudiante_id', alumno.id)
+        .order('fecha', { ascending: false }).limit(1000);
+      if (error) {
+        console.warn('No se pudo cargar la asistencia:', error.message);
+        document.getElementById('resumenAsist').innerHTML = '';
+        document.getElementById('detalleAsist').innerHTML = '<p class="leyenda">No se pudo cargar la asistencia.</p>';
+        return;
+      }
+      const f = data || [];
+      const c = e => f.filter(x => x.estado === e).length;
+      resumenDatos.asist = {
+        presente: c('presente'), ausente: c('ausente'),
+        tardanza: c('tardanza'), excusa: c('excusa'), total: f.length
+      };
+      pintarResumen();
+      // Detalle (antes en Mi Aula)
+      document.getElementById('resumenAsist').innerHTML =
+        '<div class="cuadro"><b>' + c('presente') + '</b>Presentes</div>' +
+        '<div class="cuadro"><b>' + c('ausente') + '</b>Ausencias</div>' +
+        '<div class="cuadro"><b>' + c('tardanza') + '</b>Tardanzas</div>' +
+        '<div class="cuadro"><b>' + c('excusa') + '</b>Excusas</div>';
+      const faltas = f.filter(x => x.estado !== 'presente');
+      const nombres = { ausente: 'Ausente', tardanza: 'Tardanza', excusa: 'Excusa' };
+      document.getElementById('detalleAsist').innerHTML = faltas.length
+        ? '<div class="desliza"><table><caption>Ausencias, tardanzas y excusas</caption><thead><tr><th scope="col">Fecha</th><th scope="col">Registro</th><th scope="col">Observación</th></tr></thead><tbody>' +
+          faltas.map(x => '<tr><td>' + esc(fmtFecha(x.fecha)) + '</td><td>' + esc(nombres[x.estado] || x.estado) +
+            '</td><td class="izq">' + esc(x.observacion || '') + '</td></tr>').join('') + '</tbody></table></div>'
+        : '<p class="leyenda">' + (f.length ? 'No hay ausencias ni tardanzas registradas.' : 'Todavía no hay asistencia registrada.') + '</p>';
+    }
+
+    // ===== Horario del curso (antes en Mi Aula; misma consulta) =====
+    const DIAS_HORARIO = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    function fmtHora(h) {
+      if (!h) return '';
+      const [hh, mm] = h.split(':').map(Number);
+      return (hh % 12 || 12) + ':' + String(mm).padStart(2, '0') + ' ' + (hh >= 12 ? 'p. m.' : 'a. m.');
+    }
+    async function cargarHorario(alumno) {
+      const cont = document.getElementById('horario');
+      const { data, error } = await cliente.from('horarios')
+        .select('bloques, actualizado_en').eq('curso_id', alumno.curso_id).maybeSingle();
+      if (error) {
+        cont.innerHTML = '<p class="leyenda">No se pudo cargar el horario.</p>';
+        console.warn('Horario:', error.message);
+        return;
+      }
+      const bloques = data && Array.isArray(data.bloques) ? data.bloques : [];
+      const usados = [0, 1, 2, 3, 4, 5].filter(i =>
+        bloques.some(b => !b.etiqueta && b.celdas && String(b.celdas[i] || '').trim()));
+      if (!usados.length) {
+        cont.innerHTML = '<p class="leyenda">La administración todavía no ha publicado el horario del curso.</p>';
+        return;
+      }
+      const hoyIdx = (new Date().getDay() + 6) % 7;
+      const marca = i => (i === hoyIdx ? 'hoy' : '');
+      cont.innerHTML = '<div class="desliza"><table class="horario"><caption>Horario semanal del curso</caption><thead><tr><th scope="col">Hora</th>' +
+        usados.map(i => '<th scope="col">' + DIAS_HORARIO[i] + (i === hoyIdx ? ' (hoy)' : '') + '</th>').join('') +
+        '</tr></thead><tbody>' +
+        bloques.map(b => {
+          const hora = '<th scope="row" class="hora">' + esc(fmtHora(b.inicio)) + ' - ' + esc(fmtHora(b.fin)) + '</th>';
+          if (b.etiqueta)
+            return '<tr>' + hora + '<td class="receso" colspan="' + usados.length + '">' + esc(b.etiqueta) + '</td></tr>';
+          return '<tr>' + hora + usados.map(i =>
+            '<td class="' + marca(i) + '">' + esc((b.celdas || [])[i] || '') + '</td>').join('') + '</tr>';
+        }).join('') +
+        '</tbody></table></div>' +
+        (data.actualizado_en ? '<p class="leyenda">Actualizado el ' + new Date(data.actualizado_en).toLocaleDateString('es-DO') + '</p>' : '');
+    }
+
+    function fechaHoy() {
+      const d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    // ===== Al abrir la página =====
+    async function iniciar() {
+      const { data: { session } } = await cliente.auth.getSession();
+      if (!session) { location.href = 'index.html'; return; }
+
+      const { data: perfil } = await cliente
+        .from('perfiles').select('nombre, apellido, rol').eq('id', session.user.id).single();
+      const _ex = await cliente.from('roles_adicionales').select('rol').eq('perfil_id', session.user.id);
+      const _roles = perfil ? [perfil.rol].concat((_ex.data || []).map(x => x.rol)) : [];
+      if (!perfil || (!_roles.includes('padre') && !_roles.includes('estudiante'))) {
+        // v3: sin alerta; vuelve al inicio del rol activo (o a elegir rol)
+        if (perfil && window.RolActivo && RolActivo.alInicio(_roles)) return;
+        alert('Esta página es solo para padres y alumnos');
+        location.href = 'index.html';
+        return;
+      }
+      const visual = window.RolActivo
+        ? RolActivo.preparar({ perfil: perfil, roles: _roles }, 'familia.html')
+        : null;
+      if (window.RolActivo && !visual) return;
+      rolVista = visual ? visual.rol : perfil.rol;
+      perfilActual = perfil;
+      if (esPadre()) document.body.classList.add('modo-padre');
+      if (esPadre()) {
+        const t = (sel, txt) => { const h = document.querySelector(sel); if (h) h.textContent = txt; };
+        t('#cajaMaterias h2', 'Materias y tareas de tu hijo(a)');
+        t('#cajaCalendario h2', 'Calendario de entregas');
+        t('#cajaResumen h2', 'Resumen de tu hijo(a)');
+        const ley = document.getElementById('leyendaMaterias');
+        if (ley) ley.textContent = 'Cada materia tiene su color. La franja roja indica tareas que tu hijo(a) aún no ha entregado.';
+      }
+      document.getElementById('saludo').textContent =
+        (rolVista === 'padre' ? 'Padre/Tutor: ' : 'Alumno(a): ') + perfil.nombre + ' ' + perfil.apellido;
+      if (visual) RolActivo.aplicarDiseno(visual, session.user.id);
+      if (esPadre() && !location.hash && window.Diseno && Diseno.mostrarSeccion) Diseno.mostrarSeccion('inicio', false);
+
+      datosFamilia.promesaAvisos = cargarAvisos();
+
+      // El hijo (o el alumno mismo). Los permisos de Supabase solo dejan ver ese.
+      const { data: est } = await cliente
+        .from('estudiantes').select('id, matricula, nombre, apellido, curso_id, cursos(grado, seccion)')
+        .limit(1);
+      const alumno = (est || [])[0];
+      if (!alumno) {
+        document.getElementById('datosAlumno').textContent =
+          'Todavía no hay un alumno conectado a esta cuenta. Habla con la administración del liceo.';
+        document.getElementById('resumenRapido').innerHTML = '<p class="leyenda">Todavía no hay un alumno conectado a esta cuenta.</p>';
+        document.getElementById('horario').innerHTML = '<p class="leyenda">Sin alumno conectado.</p>';
+        document.getElementById('resumenAsist').innerHTML = '';
+        const rej = document.getElementById('rejillaMaterias');
+        if (rej) rej.innerHTML = '<p class="leyenda">Todavía no hay un alumno conectado a esta cuenta.</p>';
+        return;
+      }
+      document.getElementById('datosAlumno').innerHTML =
+        (esPadre() ? '<b>Información de tu hijo(a):</b> ' : '<b>Estudiante:</b> ') + esc(alumno.apellido) + ', ' + esc(alumno.nombre) +
+        ' &nbsp; <b>Matrícula:</b> ' + esc(alumno.matricula) +
+        ' &nbsp; <b>Curso:</b> ' + (alumno.cursos ? esc(alumno.cursos.grado + ' ' + alumno.cursos.seccion) : '—');
+
+      // Materias del curso (las asignaturas no se restringen)
+      const { data: mats } = await cliente
+        .from('asignaturas').select('id, nombre').eq('curso_id', alumno.curso_id).order('orden', { nullsFirst: false }).order('nombre');
+
+      await cargarPermisos(alumno);
+      aplicarPermisosUI();
+
+      datosFamilia.alumno = alumno;
+      datosFamilia.mats = mats || [];
+      if (window.Diseno && Diseno.fijarHijo && esPadre()) Diseno.fijarHijo(alumno.nombre + ' ' + alumno.apellido);
+      cargarHorario(alumno);
+      if (permisos.ver_asistencia) cargarAsistencia(alumno);
+      if (permisos.ver_tareas) await cargarTareas(alumno, mats || []);
+      if (permisos.ver_notas) {
+        const { data: notas } = await cliente
+          .from('calificaciones').select('*').eq('estudiante_id', alumno.id);
+        datosFamilia.notas = notas || [];
+        dibujar(mats || [], notas || []);
+      }
+      await asegurarAvisos();
+      pintarTarjetasMaterias();
+      pintarResumen();
+      pintarCalendario();
+      if (window.Diseno) {
+        if (!visual) {
+          Diseno.identificar(perfil.nombre + ' ' + perfil.apellido, perfil.rol === 'padre' ? 'Padre/Tutor' : 'Alumno(a)', perfil.rol, session.user.id);
+        }
+        Diseno.sincronizarBloques();
+      }
+      // Enlace directo a una materia: familia.html#materias (y ?materia=ID desde el aviso de tareas)
+      const pm = new URLSearchParams(location.search).get('materia');
+      if (pm) irAMateria(pm);
+    }
+
+    // ===== Aviso al entrar: tareas pendientes (desaparece a los 10 segundos) =====
+    function avisarPendientes(pendientes, hoyStr) {
+      if (!pendientes.length) return;
+      try {
+        if (sessionStorage.getItem('aviso_tareas_visto')) return;   // una vez por inicio de sesión
+        sessionStorage.setItem('aviso_tareas_visto', '1');
+      } catch (e) { /* sin almacenamiento: se muestra igual */ }
+
+      const n = pendientes.length;
+      const p = pendientes[0];
+      const fmt = f => f.split('-').reverse().join('/');
+      let cuando = '';
+      if (p.fecha_limite) {
+        cuando = p.fecha_limite < hoyStr ? 'Vencida el ' + fmt(p.fecha_limite)
+          : p.fecha_limite === hoyStr ? 'Vence hoy'
+          : 'Entrega: ' + fmt(p.fecha_limite);
+      }
+      const aviso = document.createElement('div');
+      aviso.className = 'toast-tareas';
+      aviso.setAttribute('role', 'status');
+      aviso.innerHTML =
+        '<button type="button" class="sec cerrar" aria-label="Cerrar aviso" onclick="this.parentNode.remove()">✕</button>' +
+        '<b><span aria-hidden="true">📌 </span>' + (esPadre()
+          ? (n === 1 ? nombreAlumno() + ' tiene 1 tarea pendiente' : nombreAlumno() + ' tiene ' + n + ' tareas pendientes')
+          : (n === 1 ? 'Tienes 1 tarea pendiente' : 'Tienes ' + n + ' tareas pendientes')) + '</b>' +
+        '<div class="t-titulo">' + (n === 1 ? 'Tarea: ' : 'La primera: ') + '«' + esc(p.titulo) + '»</div>' +
+        (cuando ? '<div class="t-cuando">' + esc(cuando) + '</div>' : '') +
+        '<button type="button" onclick="this.parentNode.remove(); irAMateria(\'' + p.asignatura_id + '\')">Abrir la materia</button>' +
+        '<div class="barra-t"></div>';
+      document.body.appendChild(aviso);
+      setTimeout(() => aviso.remove(), 10000);
+    }
+
+    // ===== Tareas publicadas por los profesores =====
+    async function cargarTareas(alumno, mats) {
+      const ids = (mats || []).map(m => m.id);
+      if (!ids.length) { datosFamilia.tareas = []; datosFamilia.entregas = {}; datosFamilia.coments = []; return; }
+
+      // Mismas consultas que usaba Mi Aula para mostrar y entregar
+      const [t, e, c] = await Promise.all([
+        cliente.from('tareas').select('*').in('asignatura_id', ids).order('creado_en', { ascending: false }),
+        cliente.from('entregas').select('*').eq('estudiante_id', alumno.id),
+        cliente.from('comentarios_tarea').select('*').eq('estudiante_id', alumno.id).order('creado_en')
+      ]);
+      if (t.error || e.error) {
+        console.warn('No se pudieron cargar las tareas:', (t.error || e.error).message);
+        estadoTareas('No se pudieron cargar las tareas.', 'error');
+        return;
+      }
+      const tareas = t.data || [];
+      const entregas = {};
+      (e.data || []).forEach(x => entregas[x.tarea_id] = x);
+      datosFamilia.tareas = tareas;
+      datosFamilia.entregas = entregas;
+      datosFamilia.coments = (c && !c.error && c.data) || [];
+      if (window.Diseno && Diseno.novedades) Diseno.novedades.fijar('tareas', tareas.map(x => ({ id: x.id, fecha: x.creado_en })));
+      pintarCalendario();
+
+      const pendientes = tareas.filter(x => !entregas[x.id] || entregas[x.id].estado === 'pendiente');
+      pendientes.sort((a, b) => {
+        if (!a.fecha_limite && !b.fecha_limite) return new Date(b.creado_en) - new Date(a.creado_en);
+        if (!a.fecha_limite) return 1;
+        if (!b.fecha_limite) return -1;
+        return a.fecha_limite.localeCompare(b.fecha_limite);
+      });
+      const hoyStr = fechaHoy();
+      resumenDatos.pendientes = pendientes.length;
+      resumenDatos.vencidas = pendientes.filter(x => x.fecha_limite && x.fecha_limite < hoyStr).length;
+      const prox = pendientes.find(x => x.fecha_limite && x.fecha_limite >= hoyStr);
+      resumenDatos.proxima = prox ? prox.fecha_limite : null;
+      pintarResumen();
+      avisarPendientes(pendientes, hoyStr);
+    }
+
+    // ===== Avisos del liceo y del curso =====
+    async function cargarAvisos() {
+      const cont = document.getElementById('avisos');
+      const { data, error } = await cliente.from('avisos').select('*')
+        .or('fecha_expira.is.null,fecha_expira.gte.' + fechaHoy())
+        .order('importante', { ascending: false })
+        .order('creado_en', { ascending: false })
+        .limit(20);
+      if (error) {
+        // Si la tabla aún no existe o falla, no estorbamos el resto de la página
+        document.getElementById('cajaAvisos').style.display = 'none';
+        console.warn('No se pudieron cargar los avisos:', error.message);
+        datosFamilia.avisos = [];
+        datosFamilia.avisosCargados = true;
+        return;
+      }
+      datosFamilia.avisos = data || [];
+      datosFamilia.avisosCargados = true;
+      if (window.Diseno && Diseno.novedades) {
+        Diseno.novedades.fijar('avisos', datosFamilia.avisos.map(x => ({ id: x.id, fecha: x.creado_en })));
+        // Si ya está en Inicio (donde se leen), cuentan como vistos después del aviso de 5 segundos
+        setTimeout(() => {
+          if (Diseno.seccionActual && Diseno.seccionActual() === 'inicio' && document.visibilityState !== 'hidden')
+            Diseno.novedades.marcarVistos('avisos');
+        }, 6000);
+      }
+      if (!data || !data.length) {
+        cont.innerHTML = '<p class="leyenda">No hay avisos por ahora.</p>';
+        return;
+      }
+      cont.innerHTML = data.map(htmlAviso).join('');
+    }
+
+    // ===== Cálculos (mismas reglas que el profesor) =====
+    function notaQueCuenta(r, p) {
+      if (!r) return null;
+      const pNota = r['p' + p] ?? null;
+      const rp = r['rp' + p] ?? null;
+      if (pNota === null) return null;
+      if (pNota < 70 && rp !== null) return Number(rp);
+      return Number(pNota);
+    }
+    function promedioCompetencia(r) {
+      const v = PERIODOS.map(p => notaQueCuenta(r, p)).filter(x => x !== null);
+      return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null;
+    }
+    function celda(fila, valor, clase) {
+      const c = fila.insertCell();
+      c.textContent = valor === null || valor === undefined ? '' : valor;
+      if (clase) c.className = clase;
+      if (valor !== null && valor !== '' && valor !== '—' && Number(valor) < 70) c.classList.add('rojo');
+      return c;
+    }
+
+    // ===== Dibujar resumen y detalle por materia =====
+    function dibujar(mats, notas) {
+      const resumen = document.getElementById('resumen');
+      const detalle = document.getElementById('detalle');
+      const finales = [];
+
+      mats.forEach(m => {
+        const deMateria = notas.filter(n => n.asignatura_id === m.id);
+        const porComp = c => deMateria.find(n => n.competencia === c);
+
+        // Fila del resumen
+        const fila = resumen.insertRow();
+        fila.insertCell().outerHTML = '<th scope="row" class="izq">' + esc(m.nombre) + '</th>';
+        const pcs = [];
+        COMPETENCIAS.forEach(([c]) => {
+          const pc = promedioCompetencia(porComp(c));
+          if (pc !== null) pcs.push(pc);
+          celda(fila, pc === null ? '—' : pc.toFixed(1));
+        });
+        const fin = pcs.length ? Math.round(pcs.reduce((s, x) => s + x, 0) / pcs.length) : null;
+        if (fin !== null) finales.push(fin);
+        datosFamilia.finales[m.id] = fin;
+        celda(fila, fin === null ? '—' : fin, 'final');
+
+        // Detalle de la materia
+        const caja = document.createElement('div');
+        caja.className = 'caja';
+        caja.dataset.mat = String(m.id);
+        caja.style.display = 'none';   // se muestra con el selector de materias
+        let html = '<h3>' + esc(m.nombre) + '</h3><div class="desliza"><table><caption>Calificaciones de ' + esc(m.nombre) + ' por bloque de competencias</caption><thead><tr>' +
+          '<th class="izq" scope="col">Bloque de competencias</th>';
+        PERIODOS.forEach(p => html += '<th scope="col">P' + p + '</th><th scope="col">RP' + p + '</th>');
+        html += '<th scope="col"><abbr title="Promedio del bloque">Prom.</abbr></th></tr></thead><tbody></tbody></table></div>';
+        caja.innerHTML = html;
+        const cuerpo = caja.querySelector('tbody');
+        COMPETENCIAS.forEach(([c, nombre]) => {
+          const r = porComp(c);
+          const f = cuerpo.insertRow();
+          f.insertCell().outerHTML = '<th scope="row" class="izq">' + esc(nombre) + '</th>';
+          PERIODOS.forEach(p => {
+            celda(f, r ? r['p' + p] : null);
+            celda(f, r ? r['rp' + p] : null, 'gris');
+          });
+          const pc = promedioCompetencia(r);
+          celda(f, pc === null ? '—' : pc.toFixed(1), 'pc');
+        });
+        const ff = cuerpo.insertRow();
+        ff.insertCell().outerHTML = '<td colspan="9" style="text-align:right"><b>Calificación final</b></td>';
+        celda(ff, fin === null ? '—' : fin, 'final');
+        detalle.appendChild(caja);
+      });
+
+      // Promedio general
+      const fila = resumen.insertRow();
+      fila.insertCell().outerHTML = '<td colspan="5" style="text-align:right"><b>Promedio general</b></td>';
+      const general = finales.length ? Math.round(finales.reduce((s, x) => s + x, 0) / finales.length) : null;
+      celda(fila, general === null ? '—' : general, 'final');
+      resumenDatos.general = general;
+      pintarResumen();
+      armarFiltro(mats);
+    }
+
+    // ===== Selector de materias =====
+    let filtroActual = 'resumen';
+
+    function armarFiltro(mats) {
+      if (!mats.length) return;
+      document.getElementById('cajaFiltro').style.display = '';
+      const chip = (clave, texto) => '<button type="button" class="pestania" aria-pressed="false" data-clave="' + clave +
+        '" onclick="mostrarMateria(\'' + clave + '\')">' + texto + '</button>';
+      document.getElementById('chips').innerHTML =
+        chip('resumen', 'Solo resumen') +
+        mats.map(m => chip(String(m.id), esc(m.nombre))).join('') +
+        chip('todas', 'Ver todas');
+      mostrarMateria(filtroActual);
+    }
+
+    function mostrarMateria(clave) {
+      filtroActual = clave;
+      document.querySelectorAll('#chips button').forEach(b => {
+        b.classList.toggle('activa', b.dataset.clave === clave);
+        b.setAttribute('aria-pressed', b.dataset.clave === clave ? 'true' : 'false');
+      });
+      document.querySelectorAll('#detalle .caja').forEach(c => {
+        c.style.display = (clave === 'todas' || c.dataset.mat === clave) ? '' : 'none';
+      });
+    }
+
+    async function salir() {
+      try { sessionStorage.removeItem('aviso_tareas_visto'); } catch (e) {}
+      if (window.App && App.salir) return App.salir();
+      try { sessionStorage.removeItem('rol_activo'); } catch (e) {}
+      await cliente.auth.signOut();
+      location.href = 'index.html';
+    }
+
+    iniciar();
+  </script>
+  <script src="tema.js"></script>
+</body>
+</html>

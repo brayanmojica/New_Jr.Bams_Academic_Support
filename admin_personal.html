@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+  <script src="tema-inicial.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Personal y roles - Administración</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="comun.js"></script>
+  <script src="rol-activo.js"></script>
+<style>
+body { font-family: Arial, sans-serif; background: var(--tp-fondo, #f6efe4); margin: 0; padding: 20px; }
+.caja { background: white; padding: 20px; border-radius: 12px; max-width: 1000px; margin: 0 auto 16px;
+  box-shadow: 0 6px 20px rgba(124, 45, 18,0.12); border-top: 5px solid var(--tp-principal, #7c2d12);
+  border-left: 6px solid var(--tp-principal, #7c2d12); box-sizing: border-box; }
+h1, h2 { color: var(--tp-principal, #7c2d12); margin-top: 0; }
+select, input, button { padding: 8px; margin: 4px 0; border-radius: 6px; border: 1px solid #ccc;
+  font-family: Arial, sans-serif; font-size: 14px; box-sizing: border-box; }
+button { background: var(--tp-principal, #7c2d12); color: white; border: none; cursor: pointer; padding: 9px 14px; margin-right: 6px; }
+button:hover { opacity: 0.85; }
+button:disabled { opacity: 0.4; cursor: default; }
+button.sec { background: #e2e8f0; color: #1e293b; }
+button.mini { padding: 4px 10px; font-size: 12px; }
+.barra { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.chip { display: inline-block; background: var(--tp-suave, #fbf3e8); color: var(--tp-principal, #7c2d12); border: 1px solid var(--tp-borde, #e0c49a); border-radius: 999px;
+  padding: 4px 12px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.06em; }
+.peq { color: #475569; font-size: 13px; }
+.desliza { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+th, td { border: 1px solid #ddd; padding: 8px; font-size: 14px; text-align: left; vertical-align: top; }
+th { background: var(--tp-principal, #7c2d12); color: white; }
+.rol { display: inline-block; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: bold;
+  background: var(--tp-suave2, #f3e0c6); color: var(--tp-principal, #7c2d12); margin: 2px 4px 2px 0; }
+.rol.admin { background: #fee2e2; color: #b91c1c; }
+.rol.coordinador { background: #fef3c7; color: #92400e; }
+.rol.secretaria { background: #dcfce7; color: #166534; }
+.rol button { background: none !important; color: inherit !important; border: 0; cursor: pointer; padding: 0 0 0 6px; margin: 0; font-size: 13px; }
+.fila-accion { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.fila-accion select { margin: 2px 0; }
+.rejilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px 12px; }
+.rejilla label { font-size: 13px; color: #475569; display: block; }
+.rejilla input, .rejilla select { width: 100%; margin: 2px 0; }
+#estado { font-size: 14px; }
+</style>
+  <link rel="stylesheet" href="diseno.css">
+</head>
+<body>
+<div class="caja">
+  <div class="barra">
+    <div>
+      <span class="chip" id="chipRol">Administración</span>
+      <h1>Personal y roles</h1>
+      <p id="saludo">Cargando...</p>
+    </div>
+    <div>
+      <button class="sec" onclick="location.href='admin.html'">← Volver</button>
+      <button onclick="App.salir()">Cerrar sesión</button>
+    </div>
+  </div>
+  <span id="estado"></span>
+</div>
+
+<div class="caja" id="cajaCrear" style="display:none">
+  <h2>Crear una cuenta nueva</h2>
+  <div class="rejilla">
+    <div><label>Nombre<input id="n_nombre" maxlength="60"></label></div>
+    <div><label>Apellido<input id="n_apellido" maxlength="60"></label></div>
+    <div><label>Correo<input id="n_correo" type="email" maxlength="120" autocomplete="off"></label></div>
+    <div><label>Contraseña (mínimo 6)<input id="n_clave" type="text" maxlength="60" autocomplete="off"></label></div>
+    <div><label>Rol principal
+      <select id="n_rol"><option value="profesor">Profesor(a)</option><option value="secretaria">Secretaria(o)</option>
+      <option value="coordinador">Coordinador(a)</option></select></label></div>
+  </div>
+  <button id="btnCrear">Crear cuenta</button>
+  <p class="peq">Después puedes darle un segundo rol en la lista de abajo.</p>
+</div>
+
+<div class="caja">
+  <h2>Personal</h2>
+  <input type="search" id="filtro" aria-label="Buscar personal por nombre" placeholder="Buscar por nombre..." style="min-width:240px">
+  <div class="desliza"><table><thead><tr id="cabecera"><th>Nombre</th><th>Roles</th></tr></thead>
+  <tbody id="filas"><tr><td colspan="2">Cargando...</td></tr></tbody></table></div>
+  <p class="peq" id="notaPie">El rol principal es con el que entra al iniciar sesión. Los adicionales aparecen como opciones al entrar.
+  Si alguien deja de ser profesor, sus materias quedan sin profesor asignado. No puedes cambiar tu propio rol principal.
+  Cada cambio de roles pide la clave de autorización.</p>
+  <p class="peq" id="notaAdmin" style="display:none">Como coordinador puedes cambiar los roles de todo el personal, excepto los de un administrador (esas filas aparecen bloqueadas).</p>
+</div>
+
+  <script src="diseno.js"></script>
+  <script>Diseno.montar({grupo:"admin", pagina:"admin_personal.html"});</script>
+<script>
+const cliente = App.cliente, esc = App.esc, $ = id => document.getElementById(id);
+
+// Roles que se muestran en la lista de personal
+const ROLES = ['admin', 'coordinador', 'secretaria', 'profesor'];
+// Roles que se pueden asignar desde esta pantalla (el admin real no se asigna desde aquí)
+const ASIGNABLES = ['coordinador', 'secretaria', 'profesor'];
+
+const CLAVE_ROLES = '26102009';
+
+function pedirClave() {
+  const clave = prompt('Para cambiar roles escribe la clave de autorización:');
+  if (clave === null) return false;               // canceló
+  if (clave !== CLAVE_ROLES) {
+    alert('Clave incorrecta');
+    return false;
+  }
+  return true;
+}
+
+const msg = (t, c) => App.estado('estado', t, c);
+let ctx, personal = [], extras = {};
+
+// ¿La persona que está viendo la página es administrador real?
+// v3: se decide con el ROL ACTIVO (con el que entraste), no con todos los roles de la cuenta.
+function rolActivoActual() {
+  return window.RolActivo ? RolActivo.obtener(ctx.roles || []) : '';
+}
+function soyAdmin() {
+  return rolActivoActual() === 'admin';
+}
+function soyCoordinador() {
+  return rolActivoActual() === 'coordinador';
+}
+// Admin y coordinador pueden cambiar roles; solo el admin puede tocar a un admin
+const puedeGestionar = () => soyAdmin() || soyCoordinador();
+const esAdminObjetivo = p => p.rol === 'admin' || (extras[p.id] || []).includes('admin');
+
+async function iniciar() {
+  ctx = await App.exigirRol(['admin', 'coordinador']);
+  if (!ctx) return;
+  if (window.RolActivo) {
+    const visual = RolActivo.preparar(ctx, 'admin_personal.html');
+    if (!visual) return;
+    RolActivo.aplicarDiseno(visual, ctx.uid);
+  }
+  $('btnCrear').addEventListener('click', crear);
+  $('filtro').addEventListener('input', dibujar);
+  $('filas').addEventListener('click', clic);
+  cargar();
+}
+
+async function cargar() {
+  const [p, r] = await Promise.all([
+    cliente.from('perfiles').select('id, nombre, apellido, rol').in('rol', ROLES).order('apellido').order('nombre'),
+    cliente.from('roles_adicionales').select('perfil_id, rol')]);
+  if (p.error || r.error) {
+    $('filas').innerHTML = '<tr><td colspan="4">Error: ' + esc((p.error || r.error).message) + '. Si sigue pasando, avisa a la administración de la plataforma.</td></tr>';
+    return;
+  }
+  personal = p.data || [];
+  extras = {};
+  (r.data || []).forEach(x => { (extras[x.perfil_id] = extras[x.perfil_id] || []).push(x.rol); });
+  ajustarVista();
+  dibujar();
+}
+
+// Muestra u oculta lo que solo el administrador puede usar
+function ajustarVista() {
+  const esAdmin = soyAdmin();
+  $('cajaCrear').style.display = esAdmin ? '' : 'none';       // crear cuentas: solo administrador
+  const rolActivo = window.RolActivo ? RolActivo.obtener(ctx.roles) : '';
+  const etiqueta = (window.RolActivo && rolActivo && RolActivo.nombres()[rolActivo])
+    || (esAdmin ? 'Administrador(a)' : 'Coordinador(a)');
+  $('chipRol').textContent = etiqueta;
+  $('saludo').textContent = etiqueta + ': ' + ctx.perfil.nombre + ' ' + ctx.perfil.apellido;
+  $('notaAdmin').style.display = esAdmin ? 'none' : '';
+}
+
+const nombreRol = r => ({ admin: 'Administrador(a)', coordinador: 'Coordinador(a)', secretaria: 'Secretaria(o)', profesor: 'Profesor(a)' }[r] || r);
+
+function dibujar() {
+  const esAdmin = soyAdmin();
+  const q = $('filtro').value.trim().toLowerCase();
+  const lista = personal.filter(p => !q || (p.nombre + ' ' + p.apellido).toLowerCase().includes(q));
+
+  $('cabecera').innerHTML = '<th>Nombre</th><th>Roles</th><th>Cambiar rol principal</th><th>Dar otro rol</th>';
+
+  $('filas').innerHTML = lista.length ? lista.map(p => {
+    const yo = p.id === ctx.uid, ex = extras[p.id] || [];
+    // Un admin real solo puede ser modificado por otro admin
+    const protegido = esAdminObjetivo(p) && !esAdmin;
+    const editable = puedeGestionar() && !protegido;
+
+    const opcionesPrincipal = p.rol === 'admin' ? ['admin'].concat(ASIGNABLES) : ASIGNABLES;
+    const libres = ASIGNABLES.filter(r => r !== p.rol && !ex.includes(r));
+
+    const celdaPrincipal = protegido
+      ? '<span class="peq">🔒 Solo un administrador</span>'
+      : (yo ? '<span class="peq">—</span>' : '<div class="fila-accion"><select class="sel-principal">' +
+          opcionesPrincipal.map(r => '<option value="' + r + '"' + (r === p.rol ? ' selected' : '') + '>' + nombreRol(r) + '</option>').join('') +
+          '</select><button class="mini" data-acc="cambiar">Cambiar</button></div>');
+    const celdaExtra = editable && libres.length
+      ? '<div class="fila-accion"><select class="sel-extra">' +
+          libres.map(r => '<option value="' + r + '">' + nombreRol(r) + '</option>').join('') +
+          '</select><button class="mini sec" data-acc="agregar">Agregar</button></div>'
+      : '<span class="peq">' + (editable ? 'Ya tiene todos' : '—') + '</span>';
+
+    return '<tr data-id="' + p.id + '"><td>' + esc(p.apellido + ', ' + p.nombre) + (yo ? ' <span class="peq">(tú)</span>' : '') + '</td>' +
+      '<td><span class="rol ' + p.rol + '">' + nombreRol(p.rol) + ' · principal</span>' +
+      ex.map(r => '<span class="rol ' + r + '">' + nombreRol(r) +
+        (editable ? '<button type="button" class="sin-tema" data-acc="quitar" data-rol="' + r + '" title="Quitar este rol" aria-label="Quitar este rol">✕</button>' : '') + '</span>').join('') + '</td>' +
+      '<td>' + celdaPrincipal + '</td><td>' + celdaExtra + '</td></tr>';
+  }).join('') : '<tr><td colspan="4">Sin resultados</td></tr>';
+}
+
+async function rpc(nombre, args, textoOk) {
+  msg('Procesando...');
+  const { data, error } = await cliente.rpc(nombre, args);
+  if (error) { msg('Error: ' + error.message, 'red'); return false; }
+  const lib = data && data.materias_liberadas;
+  msg(textoOk + (lib ? ' (' + lib + ' materia(s) quedaron sin profesor)' : ''), 'green');
+  return true;
+}
+
+async function clic(e) {
+  const b = e.target.closest('[data-acc]');
+  if (!b) return;
+  if (!puedeGestionar()) { msg('No tienes permiso para cambiar roles', 'red'); return; }
+  if (!pedirClave()) return;
+
+  const tr = b.closest('tr'), id = tr.dataset.id, acc = b.dataset.acc;
+  const p = personal.find(x => x.id === id);
+  if (esAdminObjetivo(p) && !soyAdmin()) { msg('Solo un administrador puede modificar a un administrador', 'red'); return; }
+  const nom = p.nombre + ' ' + p.apellido;
+  let ok = false;
+  if (acc === 'cambiar') {
+    const nuevo = tr.querySelector('.sel-principal').value;
+    if (nuevo === p.rol) { msg('Ese ya es su rol principal', 'red'); return; }
+    if (!confirm('¿Cambiar el rol principal de ' + nom + ' a ' + nombreRol(nuevo) + '?' +
+      (p.rol === 'profesor' ? '\nSi deja de ser profesor, sus materias quedan sin asignar.' : ''))) return;
+    ok = await rpc('cambiar_rol', { p_id: id, p_rol: nuevo }, 'Rol principal cambiado ✔');
+  } else if (acc === 'agregar') {
+    const rol = tr.querySelector('.sel-extra').value;
+    ok = await rpc('agregar_rol_adicional', { p_id: id, p_rol: rol }, 'Rol agregado ✔');
+  } else if (acc === 'quitar') {
+    if (!confirm('¿Quitar el rol ' + nombreRol(b.dataset.rol) + ' a ' + nom + '?')) return;
+    ok = await rpc('quitar_rol_adicional', { p_id: id, p_rol: b.dataset.rol }, 'Rol quitado ✔');
+  }
+  if (ok) cargar();
+}
+
+async function crear() {
+  if (!soyAdmin()) { msg('Solo un administrador puede crear cuentas', 'red'); return; }
+  const a = { p_nombre: $('n_nombre').value.trim(), p_apellido: $('n_apellido').value.trim(),
+    p_correo: $('n_correo').value.trim(), p_clave: $('n_clave').value, p_rol: $('n_rol').value };
+  if (!a.p_nombre || !a.p_apellido || !a.p_correo) { msg('Completa nombre, apellido y correo', 'red'); return; }
+  if (a.p_clave.length < 6) { msg('La contraseña debe tener al menos 6 caracteres', 'red'); return; }
+  if (!pedirClave()) return;
+  $('btnCrear').disabled = true;
+  const ok = await rpc('crear_personal', a, 'Cuenta creada ✔ Dale el correo y la contraseña a la persona.');
+  $('btnCrear').disabled = false;
+  if (ok) { ['n_nombre', 'n_apellido', 'n_correo', 'n_clave'].forEach(i => $(i).value = ''); cargar(); }
+}
+
+iniciar();
+</script>
+<script src="tema.js"></script>
+</body>
+</html>

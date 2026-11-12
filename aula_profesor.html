@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <script src="tema-inicial.js"></script>
+  <script src="listado-alumnos.js" defer></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aula - Profesor</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+  <script src="rico.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: var(--tp-fondo, #f6efe4); margin: 0; padding: 20px; }
+    .caja { background: white; padding: 20px; border-radius: 12px; max-width: 960px;
+            margin: 0 auto 16px; box-shadow: 0 6px 20px rgba(124, 45, 18,0.12);
+            border-top: 5px solid var(--tp-principal, #7c2d12); border-left: 6px solid var(--tp-principal, #7c2d12); box-sizing: border-box; }
+    h1, h2, h3 { color: var(--tp-principal, #7c2d12); margin-top: 0; }
+    select, input, textarea, button { padding: 8px; margin: 4px; border-radius: 6px; border: 1px solid #ccc;
+                            font-family: Arial, sans-serif; font-size: 15px; box-sizing: border-box; }
+    textarea { width: 100%; margin: 4px 0; }
+    button { background: var(--tp-principal, #7c2d12); color: white; border: none; cursor: pointer; padding: 10px 16px; }
+    button:hover { opacity: 0.85; }
+    button.peligro { background: #dc2626; }
+    button.sec { background: #e2e8f0; color: #1e293b; }
+    .barra { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .chip { display: inline-block; background: var(--tp-suave, #fbf3e8); color: var(--tp-principal, #7c2d12); border: 1px solid var(--tp-borde, #e0c49a);
+            border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: bold;
+            text-transform: uppercase; letter-spacing: 0.06em; }
+    .desliza { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 14px; vertical-align: top; }
+    th { background: var(--tp-principal, #7c2d12); color: white; }
+    .izq { text-align: left; }
+    .tarea { border: 1px solid #e2e8f0; border-left: 4px solid var(--tp-principal, #7c2d12); border-radius: 10px;
+             padding: 12px; margin: 8px 0; background: var(--tp-papel, #fffaf3); }
+    .tarea h4 { margin: 0 0 4px; }
+    .peq { color: #475569; font-size: 13px; }
+    .rojo { color: #b91c1c; font-weight: bold; }
+    .ok { color: #15803d; font-weight: bold; }
+    .nota-in { width: 70px; text-align: center; }
+    .com-in { width: 100%; margin: 0; }
+    .hilo { background: var(--tp-papel, #fffaf3); border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; margin-top: 12px; }
+    .msg { padding: 6px 10px; border-radius: 8px; margin: 6px 0; font-size: 14px; }
+    .msg.prof { background: var(--tp-suave2, #f3e0c6); }
+    .msg.alum { background: #f1f5f9; }
+    #estado { font-size: 14px; }
+
+    /* Editor de texto con formato */
+    .editor { border: 1px solid #cbd5e1; border-radius: 8px; margin: 4px 0; background: white; }
+    .barra-ed { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 6px;
+                background: #f1f5f9; border-bottom: 1px solid #cbd5e1; border-radius: 8px 8px 0 0; }
+    .barra-ed button { margin: 0; padding: 6px 10px; font-size: 13px; }
+    .barra-ed .sep { width: 1px; height: 22px; background: #cbd5e1; margin: 0 4px; }
+    .barra-ed .color { width: auto; min-width: 28px; height: 28px; padding: 0 7px; border-radius: 6px;
+                       border: 1px solid #cbd5e1; background: #fff !important; box-shadow: none; font-weight: 700; }
+    .barra-ed .color[data-color="#111827"] span { color: #111827 !important; }
+    .barra-ed .color[data-color="#dc2626"] span { color: #dc2626 !important; }
+    .barra-ed .color[data-color="#1d4ed8"] span { color: #1d4ed8 !important; }
+    .barra-ed .color[data-color="#15803d"] span { color: #15803d !important; }
+    .area-ed h3, .contenido-rico h3 { color: inherit; }
+    .grupo-tareas .tarea { margin: 8px 0; }
+    .area-ed { min-height: 130px; max-height: 420px; overflow-y: auto; padding: 10px; outline: none; font-size: 15px; }
+    .area-ed:empty:before { content: attr(data-ph); color: #94a3b8; }
+    .contenido-rico img { max-width: 100%; height: auto; border-radius: 6px; margin: 6px 0; }
+    .contenido-rico ul, .contenido-rico ol { padding-left: 24px; margin: 6px 0; }
+    .contenido-rico a { color: #1d4ed8; }
+    .aviso-ed { background: #fef9c3; border: 1px solid #fde68a; color: #854d0e; border-radius: 8px;
+                padding: 8px 12px; margin: 6px 0; font-size: 14px; }
+    #cajaNueva.editando { border-top-color: #d97706 !important; border-left-color: #d97706 !important; }
+  </style>
+  <link rel="stylesheet" href="diseno.css">
+</head>
+<body>
+
+  <div class="caja">
+    <div class="barra">
+      <div>
+        <span class="chip">Profesor</span>
+        <h1>Aula: tareas y calificaciones</h1>
+        <p id="saludo">Cargando...</p>
+      </div>
+      <div>
+        <button class="sec" onclick="location.href='profesor.html'">← Volver a calificaciones</button>
+        <button onclick="salir()">Cerrar sesión</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="caja" id="cajaNueva">
+    <h2 id="tituloForm">Asignar una tarea</h2>
+    <label><b>Materia:</b> <select id="materia" onchange="alCambiarMateriaAsignar()"></select></label>
+    <span id="estado"></span>
+    <div id="avisoEdicion" class="aviso-ed" style="display:none"></div>
+    <input type="text" id="tTitulo" aria-label="Título de la tarea" placeholder="Título de la tarea" style="width:100%;margin:4px 0">
+    <div class="editor">
+      <div class="barra-ed" onmousedown="if (event.target.closest('button')) event.preventDefault()">
+        <button type="button" class="sec" title="Negrita" onclick="cmd('bold')"><b>Negrita</b></button>
+        <button type="button" class="sec" title="Cursiva" onclick="cmd('italic')"><i>Cursiva</i></button>
+        <button type="button" class="sec" title="Subrayado" onclick="cmd('underline')"><u>Subrayado</u></button>
+        <button type="button" class="sec" title="Tachado" onclick="cmd('strikeThrough')"><s>Tachado</s></button>
+        <span class="sep"></span>
+        <button type="button" class="sec" title="Letra pequeña" onclick="cmd('fontSize', '2')" style="font-size:11px">Pequeña</button>
+        <button type="button" class="sec" title="Letra normal" onclick="cmd('fontSize', '3')">Normal</button>
+        <button type="button" class="sec" title="Letra grande" onclick="cmd('fontSize', '5')" style="font-size:16px">Grande</button>
+        <button type="button" class="sec" title="Letra muy grande" onclick="cmd('fontSize', '6')" style="font-size:19px">Muy grande</button>
+        <span class="sep"></span>
+        <button type="button" class="color" data-color="#111827" title="Texto negro" onclick="cmd('foreColor', '#111827')"><span>A</span></button>
+        <button type="button" class="color" data-color="#dc2626" title="Texto rojo" onclick="cmd('foreColor', '#dc2626')"><span>A</span></button>
+        <button type="button" class="color" data-color="#1d4ed8" title="Texto azul" onclick="cmd('foreColor', '#1d4ed8')"><span>A</span></button>
+        <button type="button" class="color" data-color="#15803d" title="Texto verde" onclick="cmd('foreColor', '#15803d')"><span>A</span></button>
+        <span class="sep"></span>
+        <button type="button" class="sec" title="Lista con viñetas" onclick="cmd('insertUnorderedList')">• Lista</button>
+        <button type="button" class="sec" title="Lista numerada" onclick="cmd('insertOrderedList')">1. Lista</button>
+        <span class="sep"></span>
+        <button type="button" class="sec" title="Insertar imagen" onclick="document.getElementById('archivoImg').click()">📷 Imagen</button>
+        <button type="button" class="sec" title="Quitar el formato del texto seleccionado" onclick="cmd('removeFormat')">Quitar formato</button>
+      </div>
+      <div id="tDesc" class="area-ed contenido-rico" contenteditable="true"
+           data-ph="Instrucciones de la tarea (opcional). Selecciona texto y usa la barra para dar formato."></div>
+    </div>
+    <input type="file" id="archivoImg" aria-label="Imagen para insertar en la tarea" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none" onchange="subirImagen(this)">
+    <div class="peq" id="estadoImg"></div>
+    <label>Fecha límite: <input type="date" id="tFecha"></label>
+    <label>Puntos: <input type="number" id="tPuntos" value="100" min="1" style="width:80px"></label>
+    <button id="btnTarea" onclick="guardarTarea()">Asignar a todo el curso</button>
+    <button class="sec" id="btnCancelar" style="display:none" onclick="cancelarEdicion()">Cancelar edición</button>
+  </div>
+
+  <div class="caja">
+    <h2>Tareas asignadas</h2>
+    <div id="listaTareas"><p class="peq">Cargando tareas...</p></div>
+  </div>
+
+  <div class="caja" id="cajaDetalle" style="display:none">
+    <h2 id="tituloDetalle"></h2>
+    <div id="descDetalle"></div>
+    <div class="listado-descarga">
+      <button type="button" class="btn-listado sin-tema" id="btnDescargarListado" onclick="descargarListadoAlumnos()" aria-describedby="ayudaListado"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42l3.3 3.3V4a1 1 0 0 1 1-1zM5 19h14a1 1 0 1 1 0 2H5a1 1 0 1 1 0-2z"/></svg> Descargar listado de alumnos</button>
+      <p class="peq ayuda-listado" id="ayudaListado">Baja un archivo para Excel (CSV) con: No., matrícula, apellidos, nombres y curso. Es la lista del curso de esta tarea; no incluye entregas, notas ni comentarios. Tiene datos personales: guárdalo con cuidado.</p>
+      <p class="estado-listado" id="estadoListado" role="status" aria-live="polite"></p>
+    </div>
+    <div class="desliza">
+      <table>
+        <thead><tr><th class="izq">Alumno</th><th>Estado</th><th class="izq">Entrega</th>
+          <th>Nota</th><th class="izq">Comentario del profesor</th><th></th></tr></thead>
+        <tbody id="filas"></tbody>
+      </table>
+    </div>
+    <div class="hilo" id="hilo" style="display:none"></div>
+  </div>
+
+    <script src="rol-activo.js"></script>
+    <script src="diseno.js"></script>
+  <script>Diseno.montar({grupo:"profesor", pagina:"aula_profesor.html"});</script>
+<script>
+    const SUPABASE_URL = 'https://twhdnaiwxpilrevngxkk.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_lEIcvZOVtVD9HIK8HFwRtg_ik68D5Ad';
+    const cliente = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let materias = [], tareas = [], alumnos = [];
+    let tareaSel = null, entregas = {}, coments = [], alumnoHilo = null;
+
+    function esc(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    function fmtFecha(f) { return f ? f.split('-').reverse().join('/') : 'Sin fecha límite'; }
+    function estado(msg, color) {
+      const e = document.getElementById('estado');
+      e.style.color = color || '#334155'; e.textContent = msg || '';
+    }
+
+    async function iniciar() {
+      const { data: { session } } = await cliente.auth.getSession();
+      if (!session) { location.href = 'index.html'; return; }
+      const { data: perfil } = await cliente.from('perfiles')
+        .select('nombre, apellido, rol').eq('id', session.user.id).single();
+      const _ex = await cliente.from('roles_adicionales').select('rol').eq('perfil_id', session.user.id);
+      const _roles = perfil ? [perfil.rol].concat((_ex.data || []).map(x => x.rol)) : [];
+      if (!perfil || !_roles.includes('profesor')) {
+        // v3: sin alerta; vuelve al inicio del rol activo (o a elegir rol)
+        if (perfil && window.RolActivo && RolActivo.alInicio(_roles)) return;
+        alert('Esta página es solo para profesores');
+        location.href = 'index.html'; return;
+      }
+      document.getElementById('saludo').textContent = 'Profesor(a): ' + perfil.nombre + ' ' + perfil.apellido;
+      uid = session.user.id;
+
+      // v4: el marco (menú y botones de rol) se prepara ANTES de buscar materias,
+      // así los botones de rol aparecen aunque la cuenta no tenga materias.
+      if (window.RolActivo) {
+        const visual = RolActivo.preparar({ perfil: perfil, roles: _roles }, 'aula_profesor.html');
+        if (!visual) return;   // v3: página de otro rol activo -> ya redirigió
+        RolActivo.aplicarDiseno(visual, session.user.id);
+      }
+      const { data, error: errMat } = await cliente.from('asignaturas')
+        .select('id, nombre, curso_id, cursos(grado, seccion)')
+        .eq('profesor_id', session.user.id)
+        .order('orden', { nullsFirst: false }).order('nombre');
+      materias = data || [];
+      const sel = document.getElementById('materia');
+      if (errMat) {
+        sel.add(new Option('No se pudieron cargar tus materias', ''));
+        estado('No se pudieron cargar tus materias (' + errMat.message + '). Revisa tu conexión y vuelve a abrir la página.', '#b91c1c');
+        dibujarTareas();
+        return;
+      }
+      if (!materias.length) {
+        sel.add(new Option('No tienes materias asignadas', ''));
+        estado('La cuenta ' + (session.user.email || '') + ' no tiene materias asignadas como profesor(a). ' +
+          'Pide a la administración que te asigne en «Materias y profesores».' +
+          (location.protocol === 'file:' ? ' Si abriste la plataforma como archivo, ábrela desde el sitio publicado o un servidor (http).' : ''), '#44403c');
+        dibujarTareas();
+        return;
+      }
+      materias.forEach(m => sel.add(new Option(
+        m.nombre + ' - ' + (m.cursos ? m.cursos.grado + ' ' + m.cursos.seccion : ''), m.id)));
+      await cargarTodasLasTareas();
+      // v3: desde Inicio del profesor se llega con ?tarea=ID para calificar esa tarea directamente
+      const tareaPedida = new URLSearchParams(location.search).get('tarea');
+      const tPedida = tareaPedida && tareas.find(t => String(t.id) === String(tareaPedida));
+      if (tPedida) abrirTarea(tPedida.id);
+    }
+
+    function materiaActual() {
+      return materias.find(m => String(m.id) === document.getElementById('materia').value);
+    }
+    function materiaDeId(id) {
+      return materias.find(m => String(m.id) === String(id));
+    }
+    function etiquetaMateria(m) {
+      if (!m) return 'Materia';
+      const curso = m.cursos ? (m.cursos.grado + ' ' + m.cursos.seccion) : '';
+      return curso ? (m.nombre + ' - ' + curso) : m.nombre;
+    }
+
+    function alCambiarMateriaAsignar() {
+      if (typeof tareaEditando !== 'undefined' && tareaEditando) cancelarEdicion();
+    }
+
+    async function cargarTodasLasTareas() {
+      const ids = materias.map(m => m.id);
+      if (!ids.length) {
+        tareas = [];
+        dibujarTareas();
+        return;
+      }
+      const { data, error } = await cliente.from('tareas').select('*')
+        .in('asignatura_id', ids)
+        .order('creado_en', { ascending: false });
+      if (error) {
+        estado('No se pudieron cargar las tareas: ' + error.message, 'red');
+        tareas = [];
+        dibujarTareas();
+        return;
+      }
+      const permitidos = new Set(ids.map(String));
+      tareas = (data || []).filter(x => permitidos.has(String(x.asignatura_id)));
+      dibujarTareas();
+    }
+
+    async function cambiarMateria() {
+      alCambiarMateriaAsignar();
+    }
+
+    function htmlDeTarea(tar) {
+      return '<div class="tarea"><h4>' + esc(tar.titulo) + '</h4>' +
+        '<div class="peq">Entrega: ' + fmtFecha(tar.fecha_limite) + ' &nbsp;·&nbsp; ' + tar.puntos + ' puntos</div>' +
+        '<button onclick="abrirTarea(\'' + tar.id + '\')">Ver entregas y calificar</button>' +
+        '<button class="sec" onclick="editarTarea(\'' + tar.id + '\')">Editar</button>' +
+        '<button class="peligro" onclick="borrarTarea(\'' + tar.id + '\')">Borrar</button></div>';
+    }
+
+    function dibujarTareas() {
+      const cont = document.getElementById('listaTareas');
+      if (!materias.length) {
+        cont.innerHTML = '<p class="peq">No se han asignado tareas</p>';
+        return;
+      }
+      const porMateria = {};
+      tareas.forEach(tar => {
+        const k = String(tar.asignatura_id);
+        (porMateria[k] || (porMateria[k] = [])).push(tar);
+      });
+      cont.innerHTML = materias.map(m => {
+        const lista = porMateria[String(m.id)] || [];
+        return '<div class="grupo-tareas"><h3>' + esc(etiquetaMateria(m)) + '</h3>' +
+          (lista.length ? lista.map(htmlDeTarea).join('') : '<p class="peq">No se han asignado tareas</p>') +
+          '</div>';
+      }).join('');
+    }
+
+    async function cargarAlumnosDeCurso(cursoId) {
+      const { data, error } = await cliente.from('estudiantes')
+        .select('id, matricula, nombre, apellido, orden')
+        .eq('curso_id', cursoId)
+        .order('orden', { nullsFirst: false }).order('apellido');
+      if (error) {
+        estado('No se pudieron cargar los alumnos de ese curso: ' + error.message, 'red');
+        return [];
+      }
+      return data || [];
+    }
+
+    // ===== Editor de texto con formato =====
+    let uid = '';
+    let rango = null;
+    const editor = () => document.getElementById('tDesc');
+
+    function guardarRango() {
+      const s = window.getSelection();
+      if (s.rangeCount && editor().contains(s.getRangeAt(0).commonAncestorContainer)) {
+        rango = s.getRangeAt(0).cloneRange();
+      }
+    }
+    function restaurarRango() {
+      const e = editor();
+      e.focus();
+      const s = window.getSelection();
+      s.removeAllRanges();
+      if (rango) s.addRange(rango);
+      else {
+        const r = document.createRange();
+        r.selectNodeContents(e); r.collapse(false);
+        s.addRange(r);
+      }
+    }
+    function cmd(comando, valor) {
+      if (document.activeElement !== editor()) restaurarRango();
+      if (comando === 'foreColor') {
+        const ok = (window.Rico && Rico.normalizarColor) ? Rico.normalizarColor(valor) : '';
+        if (!ok) return;
+        valor = ok;
+      }
+      document.execCommand('styleWithCSS', false, false);   // usar etiquetas, no estilos
+      document.execCommand(comando, false, valor || null);
+      guardarRango();
+    }
+    function editorVacio() {
+      const e = editor();
+      return e.textContent.trim() === '' && !e.querySelector('img');
+    }
+
+    document.addEventListener('selectionchange', guardarRango);
+    // Al pegar, se limpia el formato raro (Word, páginas web) y se conserva solo el permitido
+    editor().addEventListener('paste', ev => {
+      ev.preventDefault();
+      const html = ev.clipboardData.getData('text/html');
+      const texto = ev.clipboardData.getData('text/plain');
+      const limpio = html && window.Rico ? Rico.limpiar(html) : '';
+      if (limpio) document.execCommand('insertHTML', false, limpio);
+      else document.execCommand('insertText', false, texto);
+    });
+
+    // Reduce fotos grandes (celular) antes de subirlas
+    function reducirImagen(archivo) {
+      return new Promise((resolve, reject) => {
+        if (archivo.type === 'image/gif') { resolve(archivo); return; }   // conservar animación
+        const img = new Image();
+        const url = URL.createObjectURL(archivo);
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          const MAX = 1600;
+          let w = img.naturalWidth, h = img.naturalHeight;
+          if (w <= MAX && h <= MAX && archivo.size <= 1500000) { resolve(archivo); return; }
+          const k = Math.min(1, MAX / Math.max(w, h));
+          w = Math.round(w * k); h = Math.round(h * k);
+          const c = document.createElement('canvas');
+          c.width = w; c.height = h;
+          const ctx = c.getContext('2d');
+          ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+          c.toBlob(b => b ? resolve(b) : reject(new Error('No se pudo procesar la imagen')), 'image/jpeg', 0.85);
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('No se pudo leer la imagen')); };
+        img.src = url;
+      });
+    }
+
+    async function subirImagen(input) {
+      const archivo = input.files && input.files[0];
+      input.value = '';
+      const msg = document.getElementById('estadoImg');
+      if (!archivo) return;
+      if (!/^image\/(jpeg|png|webp|gif)$/.test(archivo.type)) {
+        msg.style.color = 'red'; msg.textContent = 'Solo se permiten imágenes JPG, PNG, WEBP o GIF'; return;
+      }
+      if (!uid) { msg.style.color = 'red'; msg.textContent = 'Espera a que cargue la página e inténtalo de nuevo'; return; }
+      msg.style.color = '#334155'; msg.textContent = 'Subiendo imagen...';
+      try {
+        const blob = await reducirImagen(archivo);
+        if (blob.size > 5 * 1024 * 1024) throw new Error('La imagen pesa más de 5 MB');
+        const ext = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' }[blob.type] || 'jpg';
+        const ruta = uid + '/' + crypto.randomUUID() + '.' + ext;
+        const { error } = await cliente.storage.from('tareas')
+          .upload(ruta, blob, { contentType: blob.type, cacheControl: '31536000' });
+        if (error) throw error;
+        const { data } = cliente.storage.from('tareas').getPublicUrl(ruta);
+        restaurarRango();
+        document.execCommand('insertHTML', false, '<img src="' + data.publicUrl + '" alt="Imagen de la tarea"><br>');
+        guardarRango();
+        msg.style.color = 'green'; msg.textContent = 'Imagen agregada ✔';
+      } catch (error) {
+        console.error(error);
+        msg.style.color = 'red';
+        msg.textContent = 'No se pudo subir la imagen: ' + (error.message || error) +
+          (String(error.message || '').includes('Bucket not found') ? ' (todavía no está listo el espacio para imágenes; avisa a la administración de la plataforma)' : '');
+      }
+    }
+
+    // ===== Crear y editar tareas =====
+    let tareaEditando = null;
+
+    function limpiarFormulario(reiniciarPuntos) {
+      document.getElementById('tTitulo').value = '';
+      editor().innerHTML = '';
+      rango = null;
+      document.getElementById('estadoImg').textContent = '';
+      document.getElementById('tFecha').value = '';
+      if (reiniciarPuntos) document.getElementById('tPuntos').value = 100;
+    }
+
+    function modoEdicion(si) {
+      document.getElementById('tituloForm').textContent = si ? 'Editar tarea' : 'Asignar una tarea';
+      document.getElementById('btnTarea').textContent = si ? 'Guardar cambios' : 'Asignar a todo el curso';
+      document.getElementById('btnCancelar').style.display = si ? '' : 'none';
+      document.getElementById('cajaNueva').classList.toggle('editando', si);
+      const aviso = document.getElementById('avisoEdicion');
+      aviso.style.display = si ? '' : 'none';
+      aviso.textContent = si && tareaEditando
+        ? 'Estás editando: "' + tareaEditando.titulo + '". Al guardar, los alumnos verán los cambios de inmediato.'
+        : '';
+    }
+
+    function editarTarea(id) {
+      const t = tareas.find(x => x.id === id);
+      if (!t) return;
+      if (!window.Rico || !window.DOMPurify) {
+        estado('No cargó el editor seguro. Revisa tu conexión a internet y recarga la página.', 'red'); return;
+      }
+      tareaEditando = t;
+      const selMat = document.getElementById('materia');
+      if (selMat && t.asignatura_id != null) selMat.value = String(t.asignatura_id);
+      document.getElementById('tTitulo').value = t.titulo || '';
+      let html = '';
+      if (t.descripcion_html) html = Rico.limpiar(t.descripcion_html);
+      else if (t.descripcion) html = Rico.esc(t.descripcion).replace(/\n/g, '<br>');
+      editor().innerHTML = html;
+      rango = null;
+      document.getElementById('estadoImg').textContent = '';
+      document.getElementById('tFecha').value = t.fecha_limite || '';
+      document.getElementById('tPuntos').value = t.puntos;
+      modoEdicion(true);
+      estado('');
+      document.getElementById('cajaNueva').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function cancelarEdicion() {
+      tareaEditando = null;
+      limpiarFormulario(true);
+      modoEdicion(false);
+      estado('');
+    }
+
+    async function guardarTarea() {
+      const m = materiaActual();
+      const titulo = document.getElementById('tTitulo').value.trim();
+      if (!m || !materias.some(x => String(x.id) === String(m.id))) { estado('Elige una materia que tengas asignada', 'red'); return; }
+      if (!titulo) { estado('Escribe el título de la tarea', 'red'); return; }
+      const puntos = Number(document.getElementById('tPuntos').value);
+      if (!(puntos >= 1)) { estado('Los puntos deben ser un número mayor que 0', 'red'); return; }
+      if (!window.Rico || !window.DOMPurify) {
+        estado('No cargó el editor seguro. Revisa tu conexión a internet y recarga la página.', 'red'); return;
+      }
+      const vacia = editorVacio();
+      const descHtml = vacia ? null : (Rico.limpiar(editor().innerHTML) || null);
+      const descTexto = vacia ? null : (editor().innerText.trim() || null);
+      const fecha = document.getElementById('tFecha').value || null;
+
+      if (tareaEditando) { await actualizarTarea(titulo, descTexto, descHtml, fecha, puntos); return; }
+
+      estado('Guardando...');
+      const { error } = await cliente.from('tareas').insert({
+        asignatura_id: m.id,
+        titulo,
+        descripcion: descTexto,
+        descripcion_html: descHtml,
+        fecha_limite: fecha,
+        puntos
+      });
+      if (error) { estado('Error: ' + error.message, 'red'); return; }
+      limpiarFormulario(false);
+      estado('Tarea asignada ✔', 'green');
+      cargarTodasLasTareas();
+    }
+
+    async function actualizarTarea(titulo, descTexto, descHtml, fecha, puntos) {
+      const id = tareaEditando.id;
+      const btn = document.getElementById('btnTarea');
+      btn.disabled = true;
+      estado('Guardando cambios...');
+      try {
+        // No se puede bajar los puntos por debajo de una nota que ya se puso
+        if (puntos < Number(tareaEditando.puntos)) {
+          const { data: altas, error: e1 } = await cliente.from('entregas').select('calificacion')
+            .eq('tarea_id', id).not('calificacion', 'is', null)
+            .order('calificacion', { ascending: false }).limit(1);
+          if (e1) throw e1;
+          if (altas && altas.length && Number(altas[0].calificacion) > puntos) {
+            estado('No se puede: ya hay una nota de ' + altas[0].calificacion +
+              ' y la tarea quedaría sobre ' + puntos + '. Sube los puntos o corrige esa nota primero.', 'red');
+            return;
+          }
+        }
+        const { data, error } = await cliente.from('tareas').update({
+          titulo,
+          descripcion: descTexto,
+          descripcion_html: descHtml,
+          fecha_limite: fecha,
+          puntos
+        }).eq('id', id).select().single();
+        if (error) {
+          estado(error.code === 'PGRST116'
+            ? 'No se pudo guardar: tu cuenta todavía no tiene permiso para editar tareas. Avisa a la administración de la plataforma.'
+            : 'Error: ' + error.message, 'red');
+          return;
+        }
+        const i = tareas.findIndex(x => x.id === id);
+        if (i >= 0) tareas[i] = data;
+        if (tareaSel && tareaSel.id === id) {
+          tareaSel = data;
+          document.getElementById('tituloDetalle').textContent = data.titulo + ' (sobre ' + data.puntos + ')';
+          document.getElementById('descDetalle').innerHTML = Rico.render(data);
+          dibujarFilas();
+        }
+        tareaEditando = null;
+        limpiarFormulario(true);
+        modoEdicion(false);
+        dibujarTareas();
+        estado('Tarea actualizada ✔', 'green');
+      } catch (error) {
+        console.error(error);
+        estado('Error: ' + (error.message || error), 'red');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function borrarTarea(id) {
+      if (!confirm('¿Borrar la tarea con todas sus entregas y comentarios?')) return;
+      const { error } = await cliente.from('tareas').delete().eq('id', id);
+      if (error) { estado('Error: ' + error.message, 'red'); return; }
+      estado('Tarea borrada', 'green');
+      cargarTodasLasTareas();
+    }
+
+    async function abrirTarea(id) {
+      tareaSel = tareas.find(t => t.id === id);
+      if (!tareaSel) return;
+      const mat = materiaDeId(tareaSel.asignatura_id);
+      if (!mat) { estado('Esa tarea no pertenece a una materia tuya', 'red'); return; }
+      alumnos = await cargarAlumnosDeCurso(mat.curso_id);
+      alumnoHilo = null;
+      const [e, c] = await Promise.all([
+        cliente.from('entregas').select('*').eq('tarea_id', id),
+        cliente.from('comentarios_tarea').select('*').eq('tarea_id', id).order('creado_en')
+      ]);
+      entregas = {};
+      (e.data || []).forEach(x => entregas[x.estudiante_id] = x);
+      coments = c.data || [];
+      document.getElementById('cajaDetalle').style.display = '';
+      document.getElementById('tituloDetalle').textContent = tareaSel.titulo +
+        ' (sobre ' + tareaSel.puntos + ')';
+      document.getElementById('descDetalle').innerHTML = Rico.render(tareaSel);
+      dibujarFilas();
+      document.getElementById('hilo').style.display = 'none';
+      document.getElementById('cajaDetalle').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function etiquetaEstado(en) {
+      if (!en || en.estado === 'pendiente') return '<span class="rojo">Pendiente</span>';
+      if (en.estado === 'calificada') return '<span class="ok">Calificada</span>';
+      let tarde = '';
+      if (tareaSel.fecha_limite && en.entregado_en &&
+          new Date(en.entregado_en) > new Date(tareaSel.fecha_limite + 'T23:59:59')) tarde = ' <span class="rojo">(tarde)</span>';
+      return 'Entregada' + tarde;
+    }
+
+    function dibujarFilas() {
+      const cuerpo = document.getElementById('filas');
+      cuerpo.innerHTML = alumnos.map(a => {
+        const en = entregas[a.id];
+        const n = coments.filter(c => c.estudiante_id === a.id).length;
+        let ent = '—';
+        if (en && (en.texto || en.enlace)) {
+          ent = esc(en.texto || '');
+          if (en.enlace) {
+            const ok = /^https?:\/\//i.test(en.enlace);
+            ent += (ent ? '<br>' : '') + (ok
+              ? '<a href="' + esc(en.enlace) + '" target="_blank" rel="noopener">Abrir enlace</a>'
+              : esc(en.enlace));
+          }
+        }
+        return '<tr><td class="izq">' + esc(a.apellido) + ', ' + esc(a.nombre) + '</td>' +
+          '<td>' + etiquetaEstado(en) + '</td>' +
+          '<td class="izq">' + ent + '</td>' +
+          '<td><input class="nota-in" type="number" min="0" max="' + tareaSel.puntos + '" step="0.1" id="n' + a.id + '" value="' +
+            (en && en.calificacion !== null ? en.calificacion : '') + '"></td>' +
+          '<td><input class="com-in" type="text" id="c' + a.id + '" placeholder="Comentario" value="' +
+            esc(en ? en.comentario_profesor : '') + '"></td>' +
+          '<td><button onclick="guardarNota(' + a.id + ')">Guardar</button>' +
+          '<button class="sec" onclick="abrirHilo(' + a.id + ')">Chat (' + n + ')</button></td></tr>';
+      }).join('');
+    }
+
+    async function guardarNota(estId) {
+      const txt = document.getElementById('n' + estId).value;
+      const nota = txt === '' ? null : Number(txt);
+      if (nota !== null && (isNaN(nota) || nota < 0 || nota > tareaSel.puntos)) {
+        estado('La nota debe estar entre 0 y ' + tareaSel.puntos, 'red'); return;
+      }
+      const previo = entregas[estId];
+      let nuevoEstado = 'pendiente';
+      if (nota !== null) nuevoEstado = 'calificada';
+      else if (previo && (previo.texto || previo.enlace)) nuevoEstado = 'entregada';
+      const fila = {
+        tarea_id: tareaSel.id,
+        estudiante_id: estId,
+        calificacion: nota,
+        comentario_profesor: document.getElementById('c' + estId).value.trim() || null,
+        estado: nuevoEstado,
+        calificado_en: nota !== null ? new Date().toISOString() : null
+      };
+      estado('Guardando...');
+      const { data, error } = await cliente.from('entregas')
+        .upsert(fila, { onConflict: 'tarea_id,estudiante_id' }).select().single();
+      if (error) { estado('Error al guardar: ' + error.message, 'red'); return; }
+      entregas[estId] = data;
+      estado('Nota guardada ✔', 'green');
+      dibujarFilas();
+    }
+
+    function abrirHilo(estId) {
+      alumnoHilo = estId;
+      const a = alumnos.find(x => x.id === estId);
+      const msgs = coments.filter(c => c.estudiante_id === estId);
+      const caja = document.getElementById('hilo');
+      caja.style.display = '';
+      caja.innerHTML = '<h3>Comentarios con ' + esc(a.nombre) + ' ' + esc(a.apellido) + '</h3>' +
+        (msgs.length ? msgs.map(m =>
+          '<div class="msg ' + (m.autor_rol === 'profesor' || m.autor_rol === 'admin' ? 'prof' : 'alum') + '">' +
+          '<b>' + (m.autor_rol === 'profesor' ? 'Tú' : m.autor_rol === 'admin' ? 'Administración' : 'Alumno/Familia') + ':</b> ' +
+          esc(m.mensaje) + '<br><span class="peq">' + new Date(m.creado_en).toLocaleString('es-DO') + '</span></div>').join('')
+          : '<p class="peq">Aún no hay comentarios.</p>') +
+        '<textarea id="nuevoMsg" rows="2" placeholder="Escribe un comentario..."></textarea>' +
+        '<button onclick="enviarComentario()">Enviar comentario</button>';
+      caja.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    async function enviarComentario() {
+      const t = document.getElementById('nuevoMsg').value.trim();
+      if (!t || !alumnoHilo) return;
+      const { data, error } = await cliente.from('comentarios_tarea').insert({
+        tarea_id: tareaSel.id, estudiante_id: alumnoHilo, autor_rol: 'profesor', mensaje: t
+      }).select().single();
+      if (error) { estado('Error: ' + error.message, 'red'); return; }
+      coments.push(data);
+      dibujarFilas();
+      abrirHilo(alumnoHilo);
+    }
+
+    async function salir() {
+      await cliente.auth.signOut();
+      location.href = 'index.html';
+    }
+
+    iniciar();
+  </script>
+  <script>
+    /* v4.1.1: Descargar listado de alumnos (CSV). Solo usa lo que esta página ya cargó. */
+    function descargarListadoAlumnos() {
+      if (!window.DescargaListados) { alert('Falta el archivo listado-alumnos.js en la carpeta de la plataforma.'); return; }
+      DescargaListados.descargarAlumnos(alumnos, {
+        curso: (function () { const m = tareaSel && materiaDeId(tareaSel.asignatura_id); return (m && m.cursos) ? (m.cursos.grado + ' ' + m.cursos.seccion) : ''; })(),
+        mensajeVacio: 'No hay alumnos cargados. Abre una tarea primero.'
+      });
+    }
+  </script>
+  <script src="tema.js"></script>
+</body>
+</html>

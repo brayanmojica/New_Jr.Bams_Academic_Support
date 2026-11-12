@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <script src="tema-inicial.js"></script>
+  <script src="listado-alumnos.js" defer></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registro de Calificaciones</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Librerías para el Boletín de notas (PDF y Excel) -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: var(--tp-fondo, #f6efe4); margin: 0; padding: 20px; }
+    .caja { background: white; padding: 20px; border-radius: 12px; max-width: 960px;
+            margin: 0 auto 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            box-sizing: border-box; }
+    h1, h2, h3 { color: var(--tp-principal, #7c2d12); }
+    select, input, button { padding: 8px; margin: 4px; border-radius: 6px; border: 1px solid #ccc;
+                            font-family: Arial, sans-serif; font-size: 15px; }
+    button { background: var(--tp-principal, #7c2d12); color: white; border: none; cursor: pointer; }
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.4; cursor: default; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ddd; padding: 4px 6px; text-align: center; font-size: 14px; }
+    th { background: var(--tp-principal, #7c2d12); color: white; }
+    .izq { text-align: left; }
+    td input { width: 64px; padding: 6px; text-align: center; font-size: 16px;
+               border: 1px solid #cbd5e1; border-radius: 4px; }
+    td input::-webkit-outer-spin-button,
+    td input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    td input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+    td input:focus { outline: 3px solid var(--tp-principal, #7c2d12); background: var(--tp-suave, #fbf3e8); }
+    td input:disabled { background: #e5e7eb; color: #9ca3af; border-color: #e5e7eb; }
+    .rojo { color: #b91c1c !important; font-weight: bold; }
+    td input.rojo { background: #fef2f2; border-color: #fca5a5; }
+    .pnota { color: #475569; font-size: 13px; display: block; }
+    .final { font-weight: bold; font-size: 17px; }
+    .ayuda { color: #334155; font-size: 15px; }
+    #estado { font-weight: bold; }
+    .desliza { overflow-x: auto; }
+    table.todo th, table.todo td { padding: 4px 5px; font-size: 13px; white-space: nowrap; }
+    table.todo td.gris { background: #e5e7eb; }
+    table.todo th.sub { background: #334155; }
+    table.todo td.pc { background: var(--tp-suave, #fbf3e8); font-weight: bold; }
+
+    .caja-curso {
+      padding: 0;
+      overflow: visible;
+      border-top: 5px solid var(--tp-principal, #7c2d12);
+      border-left: 6px solid var(--tp-principal, #7c2d12);
+      box-shadow: 0 6px 20px rgba(124, 45, 18, 0.12);
+    }
+    .caja-header { padding: 16px 20px; }
+    .caja-header h1 { margin: 8px 0 6px; }
+    .barra-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .chip {
+      display: inline-block;
+      background: var(--tp-suave, #fbf3e8);
+      color: var(--tp-principal, #7c2d12);
+      border: 1px solid var(--tp-borde, #e0c49a);
+      border-radius: 999px;
+      padding: 4px 12px;
+      font-size: 12px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .cabecera-curso {
+      position: sticky;
+      top: 0;
+      z-index: 25;
+      background: #ffffff;
+      border-radius: 12px 12px 0 0;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.07);
+    }
+    .barra-curso {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      padding: 16px 20px 8px;
+    }
+    .curso-elige h2 { margin: 0 0 6px; }
+    .ayuda-curso {
+      margin: 0 0 10px;
+      color: #475569;
+      font-size: 0.95em;
+    }
+    .curso-badge-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+    }
+    .curso-activo-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #64748b;
+      font-weight: bold;
+    }
+    .badge-curso {
+      display: inline-block;
+      background: var(--tp-principal, #7c2d12);
+      color: #fff;
+      font-size: 1.35rem;
+      font-weight: bold;
+      line-height: 1.25;
+      padding: 12px 18px;
+      border-radius: 12px;
+      letter-spacing: 0.02em;
+      box-shadow: 0 4px 12px rgba(124, 45, 18, 0.28);
+      max-width: 320px;
+      text-align: center;
+    }
+    .badge-curso.vacio {
+      background: #94a3b8;
+      box-shadow: none;
+    }
+    .texto-curso-activo {
+      margin: 0;
+      padding: 0 20px 10px;
+      color: #334155;
+      font-size: 0.98em;
+    }
+    .pestanias {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      padding: 0 16px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    button.pestania {
+      background: transparent;
+      color: #334155;
+      border: none;
+      border-bottom: 3px solid transparent;
+      border-radius: 8px 8px 0 0;
+      margin: 0;
+      padding: 10px 16px;
+      font-weight: bold;
+    }
+    button.pestania:hover {
+      opacity: 1;
+      background: #f1f5f9;
+      color: var(--tp-principal, #7c2d12);
+    }
+    button.pestania[aria-selected="true"] {
+      background: var(--tp-suave, #fbf3e8);
+      color: var(--tp-principal, #7c2d12);
+      border-bottom-color: var(--tp-principal, #7c2d12);
+    }
+    .subcaja {
+      background: var(--tp-papel, #fffaf3);
+      border: 1px solid #e2e8f0;
+      border-left: 4px solid var(--tp-principal, #7c2d12);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .subcaja h2, .subcaja h3 { margin: 0 0 10px; }
+    .cuerpo-seccion { padding: 16px 20px 20px; }
+    #cajaBoletin { margin-top: 16px; }
+    /* Tabla de notas: scroll interno; los dos bloques quedan separados */
+    .lista-notas-scroll {
+      max-height: min(55vh, 520px);
+      overflow: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      background: #fff;
+    }
+    .lista-notas-scroll table { margin-top: 0; }
+    #seccionSelector, #seccionNotas {
+      position: relative;
+      z-index: auto;
+    }
+    #seccionSelector .cabecera-curso,
+    #seccionNotas .cabecera-curso {
+      position: relative;
+      top: auto;
+      z-index: auto;
+      box-shadow: none;
+    }
+
+    .ayuda-minerd { margin: 14px 0 0; }
+    @media (max-width: 700px) {
+      .barra-curso, .barra-header {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .curso-badge-wrap { align-items: flex-start; }
+      .badge-curso { font-size: 1.15rem; max-width: 100%; }
+      button.pestania { padding: 10px 12px; }
+    }
+  </style>
+  <link rel="stylesheet" href="diseno.css">
+</head>
+<body>
+
+  <div class="caja caja-curso caja-header">
+    <div class="barra-header">
+      <div>
+        <span class="chip">Profesor</span>
+        <h1>Registro de Calificaciones</h1>
+        <p id="saludo">Cargando...</p>
+      </div>
+      <div><button onclick="location.href='mis_datos.html'">Mis datos</button><button onclick="location.href='aula_profesor.html'">Aula (tareas)</button><button onclick="location.href='asistencia_profesor.html'">Asistencias</button><button onclick="salir()">Cerrar sesión</button></div>
+    </div>
+  </div>
+
+  <!-- v3: Inicio del profesor con sus pendientes (solo consultas que ya existían) -->
+  <div class="caja caja-curso" id="cajaInicioProfesor">
+    <div class="cuerpo-seccion">
+      <div id="inicioTarjetas" class="diseno-tarjetas" aria-busy="true"><p class="leyenda">Cargando tus pendientes...</p></div>
+      <section aria-labelledby="hPendCalificar">
+        <h2 id="hPendCalificar">Entregas sin calificar</h2>
+        <div id="inicioEntregas"><p class="leyenda">Cargando...</p></div>
+      </section>
+      <section aria-labelledby="hMisMaterias">
+        <h2 id="hMisMaterias">Mis materias y cursos</h2>
+        <div id="inicioMaterias"><p class="leyenda">Cargando...</p></div>
+      </section>
+      <section aria-labelledby="hAvisosRecientes">
+        <h2 id="hAvisosRecientes">Avisos recientes</h2>
+        <div id="inicioAvisos"><p class="leyenda">Cargando...</p></div>
+        <p><a href="avisos.html">Ir a Avisos</a></p>
+      </section>
+    </div>
+  </div>
+
+  <!-- Bloque 1: elegir materia y período (aparte) -->
+  <div class="caja caja-curso" id="seccionSelector">
+    <div class="cabecera-curso">
+      <div class="barra-curso">
+        <div class="curso-elige">
+          <h2>Elegir materia</h2>
+          <p class="ayuda-curso">Elige la materia y el período. Las calificaciones están en el recuadro de abajo, separado.</p>
+          <label for="materia"><b>Materia:</b></label>
+          <select id="materia" onchange="cambiarMateria()"></select>
+          <span id="cajaPeriodo">
+            <label for="periodo"><b>Período:</b></label>
+            <select id="periodo" onchange="cambiarPeriodo()">
+              <option value="1">P1</option>
+              <option value="2">P2</option>
+              <option value="3">P3</option>
+              <option value="4">P4</option>
+            </select>
+          </span>
+        </div>
+        <div class="curso-badge-wrap">
+          <span class="curso-activo-label">Materia actual</span>
+          <span id="badgeMateria" class="badge-curso vacio">—</span>
+          <span id="chipCursoMateria" class="chip" hidden></span>
+        </div>
+      </div>
+      <p id="textoMateriaActiva" class="texto-curso-activo">Elige una materia para trabajar las notas.</p>
+      <div class="listado-descarga">
+        <button type="button" class="btn-listado sin-tema" id="btnDescargarListado" onclick="descargarListadoAlumnos()" aria-describedby="ayudaListado"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42l3.3 3.3V4a1 1 0 0 1 1-1zM5 19h14a1 1 0 1 1 0 2H5a1 1 0 1 1 0-2z"/></svg> Descargar listado de alumnos</button>
+        <p class="peq ayuda-listado" id="ayudaListado">Baja un archivo para Excel (CSV) con: No., matrícula, apellidos, nombres y curso. No incluye calificaciones. Tiene datos personales: guárdalo con cuidado.</p>
+        <p class="estado-listado" id="estadoListado" role="status" aria-live="polite"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bloque 2: calificaciones (aparte; la tabla se desplaza dentro) -->
+  <div class="caja caja-curso" id="seccionNotas">
+    <div class="cabecera-curso">
+      <div class="barra-curso">
+        <div class="curso-elige">
+          <h2>Calificaciones</h2>
+          <p class="ayuda-curso">Este bloque es aparte del selector de arriba. Solo se mueve la tabla por dentro.</p>
+        </div>
+      </div>
+      <div class="pestanias" role="tablist" aria-label="Vista de la tabla de notas">
+        <button type="button" role="tab" class="pestania" id="tab-notas" aria-controls="panelNotas" aria-selected="true" onclick="cambiarVista('notas')">Calificaciones (Alt+1)</button>
+        <button type="button" role="tab" class="pestania" id="tab-rp" aria-controls="panelNotas" aria-selected="false" onclick="cambiarVista('rp')">Recuperación (Alt+2)</button>
+        <button type="button" role="tab" class="pestania" id="tab-promedios" aria-controls="panelNotas" aria-selected="false" onclick="cambiarVista('promedios')">Promedios (Alt+3)</button>
+        <button type="button" role="tab" class="pestania" id="tab-todo" aria-controls="panelNotas" aria-selected="false" onclick="cambiarVista('todo')">Todo junto (Alt+4)</button>
+      </div>
+    </div>
+
+    <div class="cuerpo-seccion">
+      <div class="subcaja" id="panelNotas" role="tabpanel" aria-labelledby="tituloVista">
+        <h2 id="tituloVista"></h2>
+        <p class="ayuda" id="ayuda"></p>
+        <div class="desliza lista-notas-scroll">
+        <table id="tabla">
+          <caption id="capTabla" class="sr-only"></caption>
+          <thead id="cabeza"></thead>
+          <tbody id="cuerpo"></tbody>
+        </table>
+        </div>
+        <p id="estado" role="status" aria-live="polite"></p>
+        <button id="btnGuardar" onclick="guardar()">Guardar notas</button>
+      </div>
+      <p class="ayuda ayuda-minerd">
+        Los 4 bloques agrupan las competencias fundamentales:
+        <b>Bloque 1:</b> Comunicativa.
+        <b>Bloque 2:</b> Pensamiento Lógico, Creativo y Crítico; Resolución de Problemas.
+        <b>Bloque 3:</b> Científica y Tecnológica; Ambiental y de la Salud.
+        <b>Bloque 4:</b> Ética y Ciudadana; Desarrollo Personal y Espiritual.
+      </p>
+      <div class="subcaja" id="cajaBoletin">
+        <h3>Boletín de notas</h3>
+        <p class="ayuda">Descarga el boletín de la materia elegida arriba. Primero se guardan los cambios pendientes.</p>
+        <label for="boletinAlumno"><b>Estudiante:</b></label>
+        <select id="boletinAlumno"></select>
+        <button onclick="descargarBoletinPDF()">Descargar PDF</button>
+        <button onclick="descargarBoletinExcel()">Descargar Excel</button>
+        <p id="msgBoletin" role="status" aria-live="polite"></p>
+      </div>
+    </div>
+  </div>
+
+      <script src="rol-activo.js"></script>
+    <script src="diseno.js"></script>
+  <script>Diseno.montar({grupo:"profesor", pagina:"profesor.html"});</script>
+<script>
+    const SUPABASE_URL = 'https://twhdnaiwxpilrevngxkk.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_lEIcvZOVtVD9HIK8HFwRtg_ik68D5Ad';
+    const cliente = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const COMPETENCIAS = [1, 2, 3, 4];
+    const PERIODOS = [1, 2, 3, 4];
+    // v4: competencia 1..4 de la base de datos = Bloque 1..4 (pendiente de confirmar por la dirección)
+    const NOMBRES_COMPETENCIAS = {
+      1: 'Comunicativa',
+      2: 'Pensamiento Lógico, Creativo y Crítico; Resolución de Problemas',
+      3: 'Científica y Tecnológica; Ambiental y de la Salud',
+      4: 'Ética y Ciudadana; Desarrollo Personal y Espiritual'
+    };
+
+    let materias = [];      // materias del profesor
+    let alumnos = [];       // alumnos del curso, en orden de lista
+    let notas = {};         // notas[estudianteId][competencia] = { p1..p4, rp1..rp4 }
+    let cambiados = new Set();  // "estudianteId-competencia" que hay que guardar
+    let vista = 'notas';
+    let materiaActual = null;
+
+    // ================= AL ABRIR LA PÁGINA =================
+    async function iniciar() {
+      const { data: { session } } = await cliente.auth.getSession();
+      if (!session) { location.href = 'index.html'; return; }
+
+      const { data: perfil } = await cliente
+        .from('perfiles').select('nombre, apellido, rol').eq('id', session.user.id).single();
+      const _ex = await cliente.from('roles_adicionales').select('rol').eq('perfil_id', session.user.id);
+      const _roles = perfil ? [perfil.rol].concat((_ex.data || []).map(x => x.rol)) : [];
+      if (!perfil || (!_roles.includes('profesor') && !_roles.includes('admin'))) {
+        // v3: sin alerta; vuelve al inicio del rol activo (o a elegir rol)
+        if (perfil && window.RolActivo && RolActivo.alInicio(_roles)) return;
+        alert('Esta página es solo para profesores');
+        location.href = 'index.html';
+        return;
+      }
+      const visual = window.RolActivo
+        ? RolActivo.preparar({ perfil: perfil, roles: _roles }, 'profesor.html')
+        : null;
+      if (window.RolActivo && !visual) return;
+      document.getElementById('saludo').textContent =
+        ((visual && visual.etiqueta) || 'Profesor(a)') + ': ' + perfil.nombre + ' ' + perfil.apellido;
+      nombreProfesor = perfil.nombre + ' ' + perfil.apellido;  // para el boletín
+      if (visual) RolActivo.aplicarDiseno(visual, session.user.id);
+
+      const { data } = await cliente
+        .from('asignaturas')
+        .select('id, nombre, curso_id, cursos(grado, seccion)')
+        .eq('profesor_id', session.user.id)
+        .order('orden', { nullsFirst: false }).order('nombre');
+      materias = data || [];
+      cargarInicio(session.user.id);   // v3: Inicio con pendientes (no bloquea las notas)
+      const lista = document.getElementById('materia');
+      if (materias.length === 0) {
+        lista.add(new Option('No tienes materias asignadas', ''));
+        actualizarBadgeMateria();
+        return;
+      }
+      // Flechas izquierda/derecha entre pestañas (patrón de pestañas accesible)
+      const tabsVista = ['notas', 'rp', 'promedios', 'todo'];
+      document.querySelector('.pestanias[role=tablist]').addEventListener('keydown', ev => {
+        if (ev.key !== 'ArrowRight' && ev.key !== 'ArrowLeft') return;
+        const i = tabsVista.indexOf(vista);
+        const sig = tabsVista[(i + (ev.key === 'ArrowRight' ? 1 : tabsVista.length - 1)) % tabsVista.length];
+        ev.preventDefault();
+        cambiarVista(sig).then(() => document.getElementById('tab-' + sig).focus());
+      });
+      materias.forEach(m => lista.add(
+        new Option(m.nombre + ' - ' + m.cursos.grado + ' ' + m.cursos.seccion, m.id)));
+
+      // Atajos de teclado para las pestañas
+      document.addEventListener('keydown', ev => {
+        if (!ev.altKey) return;
+        if (ev.key === '1') { ev.preventDefault(); cambiarVista('notas'); }
+        if (ev.key === '2') { ev.preventDefault(); cambiarVista('rp'); }
+        if (ev.key === '3') { ev.preventDefault(); cambiarVista('promedios'); }
+        if (ev.key === '4') { ev.preventDefault(); cambiarVista('todo'); }
+      });
+
+      // Avisar si se intenta cerrar con notas sin guardar
+      window.addEventListener('beforeunload', ev => {
+        if (cambiados.size > 0) { ev.preventDefault(); ev.returnValue = ''; }
+      });
+
+      await cargarMateria();
+    }
+
+    // ================= INICIO DEL PROFESOR (v3) =================
+    // Solo lectura, con las mismas tablas que ya usan Aula y Avisos.
+    async function cargarInicio(uid) {
+      const escI = s => String(s ?? '').replace(/[&<>"']/g, c =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+      const nomMat = m => m.nombre + (m.cursos ? ' · ' + m.cursos.grado + ' ' + m.cursos.seccion : '');
+      const ids = materias.map(m => m.id);
+      let tareas = [], porCalificar = [], avisos = [], errorTxt = '';
+      try {
+        if (ids.length) {
+          const t = await cliente.from('tareas').select('id, titulo, asignatura_id, fecha_limite, puntos, creado_en')
+            .in('asignatura_id', ids).order('creado_en', { ascending: false });
+          if (t.error) throw t.error;
+          tareas = t.data || [];
+          const tids = tareas.map(x => x.id);
+          if (tids.length) {
+            const e = await cliente.from('entregas').select('id, tarea_id, estado').in('tarea_id', tids).eq('estado', 'entregada');
+            if (e.error) throw e.error;
+            porCalificar = e.data || [];
+          }
+        }
+      } catch (err) {
+        errorTxt = 'No se pudieron cargar las tareas: ' + (err.message || err);
+      }
+      const a = await cliente.from('avisos').select('id, titulo, curso_id, importante, creado_en, autor_nombre')
+        .order('creado_en', { ascending: false }).limit(5);
+      avisos = (!a.error && a.data) || [];
+
+      const cuenta = {};
+      porCalificar.forEach(x => { cuenta[x.tarea_id] = (cuenta[x.tarea_id] || 0) + 1; });
+      const tareasPend = tareas.filter(t => cuenta[t.id]);
+      const totalPend = porCalificar.length;
+      const hoyS = new Date().toISOString().slice(0, 10);
+      const proximas = tareas.filter(t => t.fecha_limite && t.fecha_limite >= hoyS).length;
+
+      const tarjeta = (cifra, rotulo, alerta) => '<div class="diseno-tarjeta"><span class="cifra' + (alerta ? ' alerta' : '') + '">' +
+        cifra + '</span><span class="rotulo">' + rotulo + '</span></div>';
+      const cont = document.getElementById('inicioTarjetas');
+      cont.innerHTML = tarjeta(totalPend, 'Entregas sin calificar', totalPend > 0) +
+        tarjeta(tareasPend.length, 'Tareas con entregas por revisar') +
+        tarjeta(proximas, 'Tareas con fecha de entrega próxima') +
+        tarjeta(materias.length, 'Materias asignadas');
+      cont.removeAttribute('aria-busy');
+
+      const cEnt = document.getElementById('inicioEntregas');
+      if (errorTxt) cEnt.innerHTML = '<p class="rojo" role="alert">' + escI(errorTxt) + '</p>';
+      else if (!tareasPend.length) cEnt.innerHTML = '<p class="leyenda">No tienes entregas pendientes de calificar.</p>';
+      else cEnt.innerHTML = '<ul class="diseno-lista-simple">' + tareasPend.map(t => {
+        const m = materias.find(x => x.id === t.asignatura_id);
+        return '<li><b>' + escI(t.titulo) + '</b> — ' + escI(m ? nomMat(m) : '') + '<br>' +
+          '<span class="leyenda">' + cuenta[t.id] + (cuenta[t.id] === 1 ? ' entrega sin calificar' : ' entregas sin calificar') + '</span> · ' +
+          '<a href="aula_profesor.html?tarea=' + encodeURIComponent(t.id) + '">Calificar «' + escI(t.titulo) + '»</a></li>';
+      }).join('') + '</ul>';
+
+      const cMat = document.getElementById('inicioMaterias');
+      cMat.innerHTML = materias.length
+        ? '<ul class="diseno-lista-simple">' + materias.map(m =>
+            '<li><b>' + escI(nomMat(m)) + '</b> · <button type="button" class="diseno-enlace-texto sin-tema" data-ir-materia="' + m.id + '">Calificar ' + escI(m.nombre) + '</button></li>').join('') + '</ul>'
+        : '<p class="leyenda">No tienes materias asignadas.</p>';
+      cMat.querySelectorAll('[data-ir-materia]').forEach(b => b.addEventListener('click', async () => {
+        const sel = document.getElementById('materia');
+        if (sel.value !== String(b.dataset.irMateria)) {
+          sel.value = String(b.dataset.irMateria);
+          await cambiarMateria();
+        }
+        if (window.Diseno && Diseno.mostrarSeccion) Diseno.mostrarSeccion('calificaciones');
+      }));
+
+      const cAv = document.getElementById('inicioAvisos');
+      cAv.innerHTML = avisos.length
+        ? '<ul class="diseno-lista-simple">' + avisos.map(x =>
+            '<li><b>' + escI(x.titulo) + '</b>' + (x.importante ? ' <span class="chip">Importante</span>' : '') +
+            '<br><span class="leyenda">' + (x.curso_id === null ? 'Todo el liceo' : 'Un curso') +
+            (x.autor_nombre ? ' · ' + escI(x.autor_nombre) : '') +
+            (x.creado_en ? ' · ' + new Date(x.creado_en).toLocaleDateString('es-DO') : '') + '</span></li>').join('') + '</ul>'
+        : '<p class="leyenda">' + (a.error ? 'No se pudieron cargar los avisos.' : 'No hay avisos recientes.') + '</p>';
+    }
+
+    // ================= CARGAR DATOS DE LA MATERIA =================
+    function actualizarBadgeMateria() {
+      const badge = document.getElementById('badgeMateria');
+      const texto = document.getElementById('textoMateriaActiva');
+      const chip = document.getElementById('chipCursoMateria');
+      if (!badge) return;
+      if (!materiaActual) {
+        badge.textContent = '—';
+        badge.classList.add('vacio');
+        if (texto) texto.textContent = 'Elige una materia para trabajar las notas.';
+        if (chip) { chip.textContent = ''; chip.hidden = true; }
+        return;
+      }
+      const curso = (materiaActual.cursos && materiaActual.cursos.grado)
+        ? (materiaActual.cursos.grado + ' ' + materiaActual.cursos.seccion)
+        : '';
+      badge.textContent = materiaActual.nombre;
+      badge.classList.remove('vacio');
+      if (chip) {
+        chip.textContent = curso;
+        chip.hidden = !curso;
+      }
+      if (texto) {
+        texto.textContent = curso
+          ? 'Estás calificando ' + materiaActual.nombre + ' en ' + curso + '.'
+          : 'Estás calificando ' + materiaActual.nombre + '.';
+      }
+    }
+
+    async function cargarMateria() {
+      const asignaturaId = Number(document.getElementById('materia').value);
+      materiaActual = materias.find(m => m.id === asignaturaId);
+      actualizarBadgeMateria();
+      if (!materiaActual) return;
+      ponerEstado('Cargando...', '#334155');
+
+      const { data: est } = await cliente
+        .from('estudiantes').select('id, matricula, nombre, apellido, orden')
+        .eq('curso_id', materiaActual.curso_id)
+        .order('orden', { nullsFirst: false }).order('apellido');
+      alumnos = est || [];
+
+      const { data: cal, error } = await cliente
+        .from('calificaciones').select('*')
+        .eq('asignatura_id', asignaturaId);
+      if (error) { ponerEstado('Error: ' + error.message, 'red'); return; }
+
+      notas = {};
+      alumnos.forEach(a => {
+        notas[a.id] = {};
+        COMPETENCIAS.forEach(c => notas[a.id][c] = vacio());
+      });
+      (cal || []).forEach(n => {
+        if (!notas[n.estudiante_id]) return;
+        const r = notas[n.estudiante_id][n.competencia];
+        if (!r) return;
+        PERIODOS.forEach(p => {
+          r['p' + p] = n['p' + p] ?? null;
+          r['rp' + p] = n['rp' + p] ?? null;
+        });
+      });
+      cambiados.clear();
+      ponerEstado('', '');
+      llenarSelectBoletin();  // lista de alumnos del boletín
+      dibujar();
+    }
+
+    function vacio() {
+      return { p1: null, p2: null, p3: null, p4: null, rp1: null, rp2: null, rp3: null, rp4: null };
+    }
+
+    // ================= CAMBIAR DE MATERIA, PERÍODO O PESTAÑA =================
+    async function cambiarMateria() {
+      await guardar(true);
+      await cargarMateria();
+    }
+
+    async function cambiarPeriodo() {
+      await guardar(true);
+      dibujar();
+    }
+
+    async function cambiarVista(nueva) {
+      if (nueva === vista) return;
+      await guardar(true);
+      vista = nueva;
+      dibujar();
+    }
+
+    // ================= DIBUJAR LA PESTAÑA ELEGIDA =================
+    function dibujar() {
+      ['notas', 'rp', 'promedios', 'todo'].forEach(v => {
+        const t = document.getElementById('tab-' + v);
+        t.setAttribute('aria-selected', v === vista);
+        t.tabIndex = v === vista ? 0 : -1;
+      });
+      const soloVer = vista === 'promedios' || vista === 'todo';
+      document.getElementById('cajaPeriodo').style.display = soloVer ? 'none' : 'inline';
+      document.getElementById('btnGuardar').style.display = soloVer ? 'none' : 'inline-block';
+      document.getElementById('tabla').className = vista === 'todo' ? 'todo' : '';
+
+      if (vista === 'notas') dibujarNotas();
+      else if (vista === 'rp') dibujarRP();
+      else if (vista === 'promedios') dibujarPromedios();
+      else dibujarTodo();
+
+      const primera = document.querySelector('#cuerpo input:not(:disabled)');
+      const enNotas = document.activeElement && document.activeElement.closest &&
+        document.activeElement.closest('#seccionNotas, #seccionSelector');
+      if (primera && enNotas) primera.focus();
+    }
+
+    function periodo() { return Number(document.getElementById('periodo').value); }
+
+    function encabezado(columnas) {
+      document.getElementById('cabeza').innerHTML =
+        '<tr>' + columnas.map((c, i) => '<th scope="col"' + (i === 1 ? ' class="izq"' : '') + '>' + c + '</th>').join('') + '</tr>';
+    }
+
+    function celdasAlumno(fila, a, i) {
+      fila.insertCell().textContent = i + 1;
+      // v3: el nombre es la cabecera de la fila (el lector de pantalla lo anuncia en cada nota)
+      const n = document.createElement('th');
+      n.scope = 'row';
+      n.className = 'izq';
+      n.textContent = a.apellido + ', ' + a.nombre;
+      fila.appendChild(n);
+    }
+
+    function rotuloNota(campo, c, a) {
+      return campo.toUpperCase() + ' · Bloque ' + c + ': ' + NOMBRES_COMPETENCIAS[c] + ' · ' + a.apellido + ', ' + a.nombre;
+    }
+
+    function ponerCaption(texto) {
+      const cap = document.getElementById('capTabla');
+      const mat = materiaActual ? materiaActual.nombre + (materiaActual.cursos ? ' (' + materiaActual.cursos.grado + ' ' + materiaActual.cursos.seccion + ')' : '') : '';
+      if (cap) cap.textContent = texto + (mat ? ' — ' + mat : '');
+    }
+
+    // ---------- Pestaña 1: Calificaciones del período ----------
+    function dibujarNotas() {
+      const p = periodo();
+      document.getElementById('tituloVista').textContent = 'Calificaciones del período P' + p;
+      ponerCaption('Calificaciones del período P' + p);
+      document.getElementById('ayuda').innerHTML =
+        '<b>Enter</b> o flecha abajo: siguiente alumno. Flechas izquierda y derecha: otra competencia. ' +
+        'Notas de 0 a 100; menos de 70 se ve en rojo.';
+      encabezado(['No.', 'Estudiante'].concat(COMPETENCIAS.map(c => 'Bloque ' + c + ': ' + NOMBRES_COMPETENCIAS[c])));
+
+      const cuerpo = document.getElementById('cuerpo');
+      cuerpo.innerHTML = '';
+      alumnos.forEach((a, i) => {
+        const fila = cuerpo.insertRow();
+        celdasAlumno(fila, a, i);
+        COMPETENCIAS.forEach((c, col) => {
+          const caja = crearCaja(a, c, 'p' + p, i, col);
+          caja.setAttribute('aria-label', rotuloNota('p' + p, c, a));
+          fila.insertCell().appendChild(caja);
+        });
+      });
+      if (alumnos.length === 0) mensajeVacio(6, 'Este curso no tiene alumnos');
+    }
+
+    // ---------- Pestaña 2: Recuperación del período ----------
+    function dibujarRP() {
+      const p = periodo();
+      document.getElementById('tituloVista').textContent = 'Recuperación del período RP' + p;
+      ponerCaption('Recuperación del período RP' + p);
+      document.getElementById('ayuda').innerHTML =
+        'Las casillas <b>blancas</b> son de alumnos en recuperación (P' + p + ' menor de 70). ' +
+        'Las <b>grises</b> no necesitan recuperación. El teclado salta las grises.';
+      encabezado(['No.', 'Estudiante'].concat(COMPETENCIAS.map(c => 'Bloque ' + c + ': ' + NOMBRES_COMPETENCIAS[c])));
+
+      const cuerpo = document.getElementById('cuerpo');
+      cuerpo.innerHTML = '';
+      let enRecuperacion = 0;
+      alumnos.forEach((a, i) => {
+        const fila = cuerpo.insertRow();
+        celdasAlumno(fila, a, i);
+        COMPETENCIAS.forEach((c, col) => {
+          const pNota = notas[a.id][c]['p' + p];
+          const necesita = pNota !== null && pNota < 70;
+          if (necesita) enRecuperacion++;
+
+          const celda = fila.insertCell();
+          const etiqueta = document.createElement('span');
+          etiqueta.className = 'pnota' + (necesita ? ' rojo' : '');
+          etiqueta.textContent = 'P' + p + ': ' + (pNota ?? '—');
+          celda.appendChild(etiqueta);
+
+          const caja = crearCaja(a, c, 'rp' + p, i, col);
+          caja.disabled = !necesita;
+          caja.setAttribute('aria-label', rotuloNota('rp' + p, c, a) +
+            (necesita ? ', en recuperación' : ', no está en recuperación'));
+          celda.appendChild(caja);
+        });
+      });
+      if (alumnos.length === 0) mensajeVacio(6, 'Este curso no tiene alumnos');
+      else if (enRecuperacion === 0)
+        ponerEstado('Nadie está en recuperación en el período P' + p, 'green');
+    }
+
+    // ---------- Pestaña 3: Promedios (solo ver) ----------
+    function dibujarPromedios() {
+      document.getElementById('tituloVista').textContent = 'Promedios por competencia y calificación final';
+      ponerCaption('Promedios por competencia y calificación final');
+      document.getElementById('ayuda').innerHTML =
+        'Solo para ver. Si un período tiene RP, cuenta la RP en lugar de la P. ' +
+        'El PC usa los períodos que ya tengan nota.';
+      encabezado(['No.', 'Estudiante', 'Bloque 1', 'Bloque 2', 'Bloque 3', 'Bloque 4', 'Calificación final']);
+
+      const cuerpo = document.getElementById('cuerpo');
+      cuerpo.innerHTML = '';
+      alumnos.forEach((a, i) => {
+        const fila = cuerpo.insertRow();
+        celdasAlumno(fila, a, i);
+        const pcs = [];
+        COMPETENCIAS.forEach(c => {
+          const pc = promedioCompetencia(notas[a.id][c]);
+          if (pc !== null) pcs.push(pc);
+          const celda = fila.insertCell();
+          celda.textContent = pc === null ? '—' : pc.toFixed(1);
+          if (pc !== null && pc < 70) celda.classList.add('rojo');
+        });
+        const celdaFinal = fila.insertCell();
+        celdaFinal.className = 'final';
+        if (pcs.length === 0) {
+          celdaFinal.textContent = '—';
+        } else {
+          const fin = Math.round(pcs.reduce((s, x) => s + x, 0) / pcs.length);
+          celdaFinal.textContent = fin;
+          if (fin < 70) celdaFinal.classList.add('rojo');
+        }
+      });
+      if (alumnos.length === 0) mensajeVacio(7, 'Este curso no tiene alumnos');
+    }
+
+    // ---------- Pestaña 4: Todo junto (solo ver) ----------
+    function dibujarTodo() {
+      document.getElementById('tituloVista').textContent = 'Todo junto: P, RP y promedios';
+      ponerCaption('Todo junto: P, RP y promedios');
+      document.getElementById('ayuda').innerHTML =
+        'Solo para ver, como la tabla oficial. Las RP van en gris. Menos de 70 en rojo. ' +
+        'Si no cabe en la pantalla, desliza la tabla hacia los lados.';
+
+      // Encabezado de dos filas
+      let fila1 = '<tr><th scope="col" rowspan="2">No.</th><th scope="col" rowspan="2" class="izq">Estudiante</th>';
+      COMPETENCIAS.forEach(c => fila1 += '<th scope="colgroup" colspan="8">Bloque ' + c + ': ' + NOMBRES_COMPETENCIAS[c] + '</th>');
+      fila1 += '<th scope="col" rowspan="2">Prom. bloque 1</th><th scope="col" rowspan="2">Prom. bloque 2</th><th scope="col" rowspan="2">Prom. bloque 3</th>' +
+               '<th scope="col" rowspan="2">Prom. bloque 4</th><th scope="col" rowspan="2">Final</th></tr>';
+      let fila2 = '<tr>';
+      COMPETENCIAS.forEach(c => PERIODOS.forEach(p =>
+        fila2 += '<th scope="col" class="sub"><span class="sr-only">C' + c + ' </span>P' + p + '</th><th scope="col" class="sub"><span class="sr-only">C' + c + ' </span>RP' + p + '</th>'));
+      fila2 += '</tr>';
+      document.getElementById('cabeza').innerHTML = fila1 + fila2;
+
+      const cuerpo = document.getElementById('cuerpo');
+      cuerpo.innerHTML = '';
+      alumnos.forEach((a, i) => {
+        const fila = cuerpo.insertRow();
+        celdasAlumno(fila, a, i);
+        COMPETENCIAS.forEach(c => {
+          const r = notas[a.id][c];
+          PERIODOS.forEach(p => {
+            ['p' + p, 'rp' + p].forEach(campo => {
+              const celda = fila.insertCell();
+              const v = r[campo];
+              celda.textContent = v ?? '';
+              if (campo.startsWith('rp')) celda.classList.add('gris');
+              if (v !== null && v < 70) celda.classList.add('rojo');
+            });
+          });
+        });
+        const pcs = [];
+        COMPETENCIAS.forEach(c => {
+          const pc = promedioCompetencia(notas[a.id][c]);
+          if (pc !== null) pcs.push(pc);
+          const celda = fila.insertCell();
+          celda.className = 'pc';
+          celda.textContent = pc === null ? '—' : pc.toFixed(1);
+          if (pc !== null && pc < 70) celda.classList.add('rojo');
+        });
+        const celdaFinal = fila.insertCell();
+        celdaFinal.className = 'final';
+        if (pcs.length === 0) celdaFinal.textContent = '—';
+        else {
+          const fin = Math.round(pcs.reduce((s, x) => s + x, 0) / pcs.length);
+          celdaFinal.textContent = fin;
+          if (fin < 70) celdaFinal.classList.add('rojo');
+        }
+      });
+      if (alumnos.length === 0) mensajeVacio(39, 'Este curso no tiene alumnos');
+    }
+
+    function mensajeVacio(columnas, texto) {
+      const fila = document.getElementById('cuerpo').insertRow();
+      const celda = fila.insertCell();
+      celda.colSpan = columnas;
+      celda.textContent = texto;
+    }
+
+    // ================= CÁLCULOS =================
+    // Nota que cuenta en un período: la RP si el alumno estaba en recuperación y la tiene; si no, la P
+    function notaQueCuenta(r, p) {
+      const pNota = r['p' + p];
+      const rp = r['rp' + p];
+      if (pNota === null) return null;
+      if (pNota < 70 && rp !== null) return rp;
+      return pNota;
+    }
+
+    function promedioCompetencia(r) {
+      const valores = PERIODOS.map(p => notaQueCuenta(r, p)).filter(v => v !== null);
+      if (valores.length === 0) return null;
+      return valores.reduce((s, x) => s + x, 0) / valores.length;
+    }
+
+    // ================= CASILLAS =================
+    function crearCaja(a, competencia, campo, filaN, colN) {
+      const caja = document.createElement('input');
+      caja.type = 'number';
+      caja.min = 0;
+      caja.max = 100;
+      caja.step = 'any';
+      caja.autocomplete = 'off';
+      caja.dataset.fila = filaN;
+      caja.dataset.col = colN;
+      const valor = notas[a.id][competencia][campo];
+      caja.value = valor ?? '';
+      pintar(caja);
+
+      caja.addEventListener('input', () => {
+        limitar(caja);
+        const v = caja.value === '' ? null : Number(caja.value);
+        const r = notas[a.id][competencia];
+        r[campo] = v;
+        // Si la P sube a 70 o más (o se borra), la RP ya no aplica y se borra
+        if (campo.startsWith('p') && (v === null || v >= 70)) r['r' + campo] = null;
+        cambiados.add(a.id + '-' + competencia);
+        ponerEstado('Hay cambios sin guardar', '#b45309');
+      });
+      caja.addEventListener('blur', () => limitar(caja));
+      caja.addEventListener('focus', () => caja.select());
+      caja.addEventListener('wheel', ev => ev.preventDefault());
+      caja.addEventListener('keydown', moverConTeclado);
+      return caja;
+    }
+
+    // No dejar notas menores de 0 ni mayores de 100
+    function limitar(caja) {
+      if (caja.value !== '') {
+        const v = Number(caja.value);
+        if (Number.isNaN(v)) caja.value = '';
+        else if (v > 100) caja.value = 100;
+        else if (v < 0) caja.value = 0;
+      }
+      pintar(caja);
+    }
+
+    // Rojo si es menor de 70
+    function pintar(caja) {
+      const v = caja.value === '' ? null : Number(caja.value);
+      caja.classList.toggle('rojo', v !== null && v < 70);
+    }
+
+    // ================= MOVERSE CON EL TECLADO =================
+    function moverConTeclado(ev) {
+      const teclas = ['Enter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+      if (!teclas.includes(ev.key)) return;
+      ev.preventDefault();
+
+      const fila = Number(ev.target.dataset.fila);
+      const col = Number(ev.target.dataset.col);
+      const todas = [...document.querySelectorAll('#cuerpo input')];
+      const activa = c => c && !c.disabled;
+      const en = (f, k) => todas.find(c => Number(c.dataset.fila) === f && Number(c.dataset.col) === k);
+      let destino = null;
+
+      if (ev.key === 'Enter' || ev.key === 'ArrowDown') {
+        for (let f = fila + 1; f < alumnos.length && !destino; f++)
+          if (activa(en(f, col))) destino = en(f, col);
+      } else if (ev.key === 'ArrowUp') {
+        for (let f = fila - 1; f >= 0 && !destino; f--)
+          if (activa(en(f, col))) destino = en(f, col);
+      } else {
+        const lista = todas.filter(activa);
+        const i = lista.indexOf(ev.target);
+        destino = lista[ev.key === 'ArrowRight' ? i + 1 : i - 1] || null;
+      }
+      if (destino) { destino.focus(); destino.select(); }
+    }
+
+    // ================= GUARDAR =================
+    async function guardar(automatico = false) {
+      if (cambiados.size === 0) {
+        if (!automatico) ponerEstado('No hay cambios para guardar', 'green');
+        return true;
+      }
+      const asignaturaId = materiaActual.id;
+      const registros = [...cambiados].map(clave => {
+        const [estId, comp] = clave.split('-').map(Number);
+        return {
+          estudiante_id: estId,
+          asignatura_id: asignaturaId,
+          competencia: comp,
+          ...notas[estId][comp],
+          actualizado_en: new Date().toISOString()
+        };
+      });
+
+      ponerEstado('Guardando...', '#334155');
+      const { error } = await cliente.from('calificaciones')
+        .upsert(registros, { onConflict: 'estudiante_id,asignatura_id,competencia' });
+
+      if (error) {
+        ponerEstado('Error al guardar: ' + error.message, 'red');
+        return false;
+      }
+      cambiados.clear();
+      ponerEstado('Notas guardadas ✔', 'green');
+      return true;
+    }
+
+    function ponerEstado(texto, color) {
+      const e = document.getElementById('estado');
+      e.textContent = texto;
+      e.style.color = color === 'red' ? '#b91c1c' : color === 'green' ? '#15803d' : color;
+      e.setAttribute('role', color === 'red' ? 'alert' : 'status');
+    }
+
+    // ================= BOLETÍN DE NOTAS (PDF y Excel) =================
+    const NOMBRE_LICEO = 'Liceo Experimental María Mercedes López López';
+    let nombreProfesor = '';
+
+    // Llenar la lista de estudiantes del boletín
+    function llenarSelectBoletin() {
+      const lista = document.getElementById('boletinAlumno');
+      lista.innerHTML = '';
+      lista.add(new Option('Todo el curso', 'todos'));
+      alumnos.forEach((a, i) => lista.add(new Option((i + 1) + '. ' + a.apellido + ', ' + a.nombre, a.id)));
+    }
+
+    function mensajeBoletin(texto, color) {
+      const m = document.getElementById('msgBoletin');
+      m.textContent = texto;
+      m.style.color = color;
+    }
+
+    // Quitar acentos, espacios y signos para el nombre del archivo
+    function limpiarNombre(texto) {
+      return String(texto).normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    }
+
+    function fechaHoy() {
+      return new Date().toLocaleDateString('es-DO', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+
+    function nombreCursoActual() {
+      return materiaActual.cursos.grado + ' ' + materiaActual.cursos.seccion;
+    }
+
+    // Calificación final de un alumno en esta materia (entero) o null
+    function finalAlumno(a) {
+      const pcs = COMPETENCIAS.map(c => promedioCompetencia(notas[a.id][c])).filter(v => v !== null);
+      if (pcs.length === 0) return null;
+      return Math.round(pcs.reduce((s, x) => s + x, 0) / pcs.length);
+    }
+
+    // Revisar todo antes de descargar; devuelve la lista de alumnos a incluir
+    async function prepararBoletin() {
+      if (!materiaActual) { mensajeBoletin('Elige una materia primero', 'red'); return null; }
+      const ok = await guardar(true);
+      if (!ok) { mensajeBoletin('No se pudieron guardar los cambios. Revisa el mensaje de arriba.', 'red'); return null; }
+      if (alumnos.length === 0) { mensajeBoletin('Este curso no tiene alumnos', 'red'); return null; }
+      const elegido = document.getElementById('boletinAlumno').value;
+      if (elegido === 'todos' || elegido === '') return { lista: alumnos, todos: true };
+      const a = alumnos.find(x => String(x.id) === elegido);
+      if (!a) { mensajeBoletin('No se encontró el estudiante', 'red'); return null; }
+      return { lista: [a], todos: false };
+    }
+
+    function nombreArchivoBoletin(sel, extension) {
+      const quien = sel.todos ? 'Curso' : sel.lista[0].apellido + ' ' + sel.lista[0].nombre;
+      return 'Boletin_' + limpiarNombre(materiaActual.nombre) + '_' +
+        limpiarNombre(nombreCursoActual()) + '_' + limpiarNombre(quien) + '.' + extension;
+    }
+
+    // ---------- PDF ----------
+    async function descargarBoletinPDF() {
+      const sel = await prepararBoletin();
+      if (!sel) return;
+      if (!window.jspdf) { mensajeBoletin('No cargó la librería de PDF. Revisa el internet.', 'red'); return; }
+      const doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: 'letter' });
+      const ROJO = [185, 28, 28];
+      const GRIS = [229, 231, 235];
+
+      sel.lista.forEach((a, k) => {
+        if (k > 0) doc.addPage();
+        // Encabezado
+        doc.setFontSize(15); doc.setFont('helvetica', 'bold');
+        doc.text(NOMBRE_LICEO, 396, 40, { align: 'center' });
+        doc.setFontSize(13);
+        doc.text('Boletín de notas', 396, 60, { align: 'center' });
+        doc.setFontSize(11); doc.setFont('helvetica', 'normal');
+        doc.text('Materia: ' + materiaActual.nombre + '     Curso: ' + nombreCursoActual(), 40, 85);
+        doc.text('Profesor(a): ' + nombreProfesor, 40, 101);
+        doc.text('Fecha: ' + fechaHoy(), 752, 85, { align: 'right' });
+        doc.setFont('helvetica', 'bold');
+        doc.text('Estudiante: ' + a.apellido + ', ' + a.nombre +
+          '     Matrícula: ' + (a.matricula ?? '—') + '     No.: ' + (alumnos.indexOf(a) + 1), 40, 120);
+
+        // Filas: una por competencia
+        const filas = COMPETENCIAS.map(c => {
+          const r = notas[a.id][c];
+          const fila = ['Bloque ' + c + ': ' + NOMBRES_COMPETENCIAS[c]];
+          PERIODOS.forEach(p => { fila.push(r['p' + p] ?? ''); fila.push(r['rp' + p] ?? ''); });
+          const pc = promedioCompetencia(r);
+          fila.push(pc === null ? '—' : pc.toFixed(1));
+          return fila;
+        });
+        const fin = finalAlumno(a);
+        filas.push([{ content: 'Calificación final', colSpan: 9, styles: { halign: 'right', fontStyle: 'bold' } },
+          { content: fin === null ? '—' : String(fin), styles: { fontStyle: 'bold' } }]);
+
+        doc.autoTable({
+          startY: 135,
+          head: [['Bloque de competencias', 'P1', 'RP1', 'P2', 'RP2', 'P3', 'RP3', 'P4', 'RP4', 'Prom.']],
+          body: filas,
+          theme: 'grid',
+          styles: { fontSize: 11, halign: 'center', cellPadding: 6 },
+          headStyles: { fillColor: [30, 58, 138], textColor: 255 },
+          columnStyles: { 0: { halign: 'left', cellWidth: 230 } },
+          didParseCell: d => {
+            if (d.section !== 'body') return;
+            const esFinal = d.row.index === filas.length - 1;
+            // Columnas RP en gris (2, 4, 6, 8)
+            if (!esFinal && d.column.index > 0 && d.column.index < 9 && d.column.index % 2 === 0)
+              d.cell.styles.fillColor = GRIS;
+            // Menos de 70 en rojo
+            const v = parseFloat(d.cell.raw && d.cell.raw.content !== undefined ? d.cell.raw.content : d.cell.raw);
+            if (d.column.index > 0 && !Number.isNaN(v) && v < 70) {
+              d.cell.styles.textColor = ROJO;
+              d.cell.styles.fontStyle = 'bold';
+            }
+          }
+        });
+      });
+      doc.save(nombreArchivoBoletin(sel, 'pdf'));
+      mensajeBoletin('PDF descargado ✔', 'green');
+    }
+
+    // ---------- Excel ----------
+    async function descargarBoletinExcel() {
+      const sel = await prepararBoletin();
+      if (!sel) return;
+      if (!window.XLSX) { mensajeBoletin('No cargó la librería de Excel. Revisa el internet.', 'red'); return; }
+      const v = x => (x === null || x === undefined) ? '' : x;
+      const pcTexto = pc => pc === null ? '' : Number(pc.toFixed(1));
+      let filas = [];
+
+      if (!sel.todos) {
+        // Un solo estudiante: su tabla
+        const a = sel.lista[0];
+        filas.push([NOMBRE_LICEO]);
+        filas.push(['Boletín de notas']);
+        filas.push(['Materia: ' + materiaActual.nombre, 'Curso: ' + nombreCursoActual()]);
+        filas.push(['Profesor(a): ' + nombreProfesor, 'Fecha: ' + fechaHoy()]);
+        filas.push(['Estudiante: ' + a.apellido + ', ' + a.nombre, 'Matrícula: ' + v(a.matricula)]);
+        filas.push([]);
+        filas.push(['Bloque de competencias', 'P1', 'RP1', 'P2', 'RP2', 'P3', 'RP3', 'P4', 'RP4', 'Prom.']);
+        COMPETENCIAS.forEach(c => {
+          const r = notas[a.id][c];
+          const fila = ['Bloque ' + c + ': ' + NOMBRES_COMPETENCIAS[c]];
+          PERIODOS.forEach(p => { fila.push(v(r['p' + p])); fila.push(v(r['rp' + p])); });
+          fila.push(pcTexto(promedioCompetencia(r)));
+          filas.push(fila);
+        });
+        filas.push(['Calificación final', '', '', '', '', '', '', '', '', v(finalAlumno(a))]);
+      } else {
+        // Todo el curso: una fila por estudiante
+        const cab = ['No.', 'Matrícula', 'Estudiante'];
+        COMPETENCIAS.forEach(c => PERIODOS.forEach(p => { cab.push('Bloque ' + c + ' P' + p); cab.push('Bloque ' + c + ' RP' + p); }));
+        COMPETENCIAS.forEach(c => cab.push('Prom. bloque ' + c));
+        cab.push('Final');
+        filas.push(cab);
+        alumnos.forEach((a, i) => {
+          const fila = [i + 1, v(a.matricula), a.apellido + ', ' + a.nombre];
+          COMPETENCIAS.forEach(c => PERIODOS.forEach(p => {
+            fila.push(v(notas[a.id][c]['p' + p])); fila.push(v(notas[a.id][c]['rp' + p]));
+          }));
+          COMPETENCIAS.forEach(c => fila.push(pcTexto(promedioCompetencia(notas[a.id][c]))));
+          fila.push(v(finalAlumno(a)));
+          filas.push(fila);
+        });
+      }
+      const hoja = XLSX.utils.aoa_to_sheet(filas);
+      const libro = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(libro, hoja, 'Boletin');
+      XLSX.writeFile(libro, nombreArchivoBoletin(sel, 'xlsx'));
+      mensajeBoletin('Excel descargado ✔', 'green');
+    }
+
+    async function salir() {
+      await guardar(true);
+      await cliente.auth.signOut();
+      location.href = 'index.html';
+    }
+
+    iniciar();
+  </script>
+  <script>
+    /* v4.1.1: Descargar listado de alumnos (CSV). Solo usa lo que esta página ya cargó. */
+    function descargarListadoAlumnos() {
+      if (!window.DescargaListados) { alert('Falta el archivo listado-alumnos.js en la carpeta de la plataforma.'); return; }
+      DescargaListados.descargarAlumnos(alumnos, {
+        curso: (materiaActual && materiaActual.cursos && materiaActual.cursos.grado) ? (materiaActual.cursos.grado + ' ' + materiaActual.cursos.seccion) : '',
+        mensajeVacio: 'No hay alumnos cargados para esta materia. Elige una materia primero.'
+      });
+    }
+  </script>
+  <script src="tema.js"></script>
+</body>
+</html>

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <script src="tema-inicial.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#7c2d12">
+  <title>Iniciar sesión · Liceo Brayan Jr. Mojica Severino</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="comun.js"></script>
+  <script src="rol-activo.js"></script>
+  <link rel="stylesheet" href="acceso.css">
+</head>
+<body class="es-acceso">
+  <a class="saltar" href="#correo">Saltar al formulario de inicio de sesión</a>
+  <div class="fondo" aria-hidden="true">
+    <span class="orbita o1"></span>
+    <span class="orbita o2"></span>
+    <span class="orbita o3"></span>
+    <svg viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+      <g fill="none" stroke="#7c2d12" stroke-width="1.2">
+        <circle cx="180" cy="160" r="70"/>
+        <circle cx="180" cy="160" r="110"/>
+        <polygon points="980,80 1060,140 1040,230 920,230 900,140"/>
+        <polygon points="1040,160 1100,210 1020,250"/>
+        <rect x="140" y="560" width="140" height="140" rx="8" transform="rotate(18 210 630)"/>
+        <path d="M700 620 l80 -40 l80 40 v90 h-160z"/>
+        <circle cx="640" cy="120" r="8"/>
+        <circle cx="720" cy="200" r="5"/>
+        <circle cx="400" cy="700" r="6"/>
+      </g>
+    </svg>
+  </div>
+
+  <header class="cabecera-clasica solo-clasico">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20.2h18"/><path d="M4.6 20.2V10.6L12 4.8l7.4 5.8v9.6"/><path d="M9.4 20.2v-4.6h5.2v4.6"/><path d="M12 4.8V3.2"/></svg>
+    <span data-liceo-nombre>Liceo Brayan Jr. Mojica Severino</span>
+  </header>
+  <main class="escena">
+    <div class="tarjeta">
+      <div class="logo">
+        <svg width="48" height="48" viewBox="0 0 48 48" role="img" aria-label="Emblema del liceo">
+          <rect width="48" height="48" rx="14" fill="#7c2d12"/>
+          <path d="M10 31 V22 L24 14 L38 22 V31 H10Z" fill="#fffaf3"/>
+          <rect x="16" y="25" width="6" height="6" fill="#7c2d12"/>
+          <rect x="26" y="25" width="6" height="6" fill="#7c2d12"/>
+          <path d="M22 31 V27 H26 V31" fill="#7c2d12"/>
+          <rect x="22" y="10" width="4" height="6" fill="#fde68a"/>
+        </svg>
+        <div>
+          <strong data-liceo-nombre>Liceo Brayan Jr. Mojica Severino</strong>
+          <span>Plataforma académica</span>
+        </div>
+      </div>
+
+      <form id="vista-acceso" class="activa" action="#" method="post" novalidate>
+        <div class="solo-clasico">
+          <span class="chip-clasico">Bienvenido</span>
+          <h1>Sistema Escolar</h1>
+          <p class="subtitulo-clasico" data-liceo-nombre>Liceo Brayan Jr. Mojica Severino</p>
+        </div>
+        <h1 class="solo-academico">Hola, te damos la bienvenida</h1>
+        <p class="intro solo-academico">Entra para ver tus clases, calificaciones y avisos. Usa tu correo o, si eres alumno, tu usuario.</p>
+
+        <div class="campo">
+          <label for="correo">Correo o usuario</label>
+          <input type="text" id="correo" name="correo" autocomplete="username" spellcheck="false" autocapitalize="none" placeholder="ejemplo@correo.com o juan0001" aria-describedby="ayuda-usuario">
+        </div>
+
+        <div class="campo">
+          <label for="clave">Contraseña</label>
+          <div class="clave-caja">
+            <input type="password" id="clave" name="clave" autocomplete="current-password" placeholder="Tu contraseña">
+            <button type="button" class="ver-clave sin-tema" data-clave="clave" aria-controls="clave" aria-pressed="false" aria-label="Mostrar contraseña">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="fila-acciones">
+          <button type="button" class="enlace sin-tema" data-ir="recuperar">Olvidé mi contraseña</button>
+        </div>
+
+        <button type="submit" class="btn sin-tema" id="btnEntrar">Iniciar sesión</button>
+        <p class="ayuda" id="ayuda-usuario">Si eres alumno, tu usuario es tu primer nombre en minúscula y los últimos 4 dígitos de tu matrícula. Por ejemplo: juan0001.</p>
+        <p class="estado" id="mensaje" role="status" aria-live="polite"></p>
+      </form>
+
+      <div id="vista-recuperar" class="vista" hidden>
+        <h1>¿Olvidaste tu contraseña?</h1>
+        <p class="intro">No te preocupes. Pide a la secretaría o a la dirección del liceo que te pongan una contraseña nueva.</p>
+        <p class="ayuda">Cuando entres con esa contraseña, la plataforma te pedirá que elijas una propia. Si eres alumno, lleva tu matrícula o tu usuario (por ejemplo, juan0001).</p>
+        <button type="button" class="btn secundario sin-tema" data-ir="acceso">Volver al inicio de sesión</button>
+      </div>
+
+      <div id="vista-roles" class="vista" hidden>
+        <h1>Elige cómo entrar</h1>
+        <p class="intro" id="introRoles">Tienes varios roles. ¿Con cuál quieres entrar?</p>
+        <div class="roles" id="selector" role="group" aria-label="Elegir rol para entrar"></div>
+        <p class="ayuda">Luego puedes cambiar de rol con los botones de arriba en cada página.</p>
+        <div><button type="button" class="btn secundario sin-tema" data-ir="acceso">Entrar con otra cuenta</button></div>
+      </div>
+    </div>
+  </main>
+
+<script>
+    const cliente = App.cliente;
+    const DOMINIO_ALUMNOS = '@alumnos.liceo.do';
+    const $ = id => document.getElementById(id);
+
+    // ===== Vistas del diseño (entrar / olvidé mi contraseña / elegir rol) =====
+    const VISTAS = ['acceso', 'recuperar', 'roles'];
+    function mostrar(nombre, enfocar) {
+      VISTAS.forEach(v => {
+        const el = $('vista-' + v);
+        const activa = v === nombre;
+        el.classList.toggle('activa', activa);
+        if (el.tagName !== 'FORM') el.hidden = !activa;
+      });
+      if (enfocar === false) return;
+      const foco = nombre === 'acceso' ? $('correo') : document.querySelector('#vista-' + nombre + ' button');
+      if (foco) foco.focus();
+    }
+    function estado(texto, tipo) {
+      const m = $('mensaje');
+      m.textContent = texto || '';
+      m.className = 'estado' + (tipo ? ' ' + tipo : '');
+      m.setAttribute('role', tipo === 'error' ? 'alert' : 'status');
+    }
+    document.querySelectorAll('[data-ir]').forEach(b => b.addEventListener('click', () => mostrar(b.dataset.ir)));
+    document.querySelectorAll('.ver-clave').forEach(btn => btn.addEventListener('click', () => {
+      const campo = $(btn.dataset.clave);
+      const ver = campo.type === 'password';
+      campo.type = ver ? 'text' : 'password';
+      btn.setAttribute('aria-pressed', ver ? 'true' : 'false');
+      btn.setAttribute('aria-label', ver ? 'Ocultar contraseña' : 'Mostrar contraseña');
+    }));
+    ['correo', 'clave'].forEach(id => $(id).addEventListener('input', () => $(id).removeAttribute('aria-invalid')));
+
+    function irA(rol) {
+      const permitidos = window.__rolesSesion || (App.RUTAS[rol] ? [rol] : []);
+      if (window.RolActivo) {
+        if (!RolActivo.fijar(rol, permitidos)) return;
+      } else {
+        try { sessionStorage.setItem('rol_activo', rol); } catch (e) {}
+      }
+      location.href = App.RUTAS[rol];
+    }
+
+    // Quien tiene varios roles elige con cuál entrar (orden fijo)
+    const ORDEN_ROLES = ['admin', 'coordinador', 'profesor', 'secretaria', 'estudiante', 'padre'];
+    function mostrarSelector(roles, texto) {
+      window.__rolesSesion = roles || [];
+      const cont = $('selector');
+      cont.innerHTML = '';
+      roles.slice().sort((a, b) => ORDEN_ROLES.indexOf(a) - ORDEN_ROLES.indexOf(b)).forEach(rol => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'sin-tema';
+        b.textContent = 'Entrar como ' + App.NOMBRES[rol];
+        b.addEventListener('click', () => irA(rol));
+        cont.appendChild(b);
+      });
+      $('introRoles').textContent = texto || 'Tienes varios roles. ¿Con cuál quieres entrar?';
+      mostrar('roles');
+    }
+
+    async function entrar(ev) {
+      if (ev) ev.preventDefault();
+      const campoCorreo = $('correo'), campoClave = $('clave');
+      let correo = campoCorreo.value.trim();
+      const clave = campoClave.value;
+      campoCorreo.removeAttribute('aria-invalid'); campoClave.removeAttribute('aria-invalid');
+      if (!correo || !clave) {
+        if (!correo) campoCorreo.setAttribute('aria-invalid', 'true');
+        if (!clave) campoClave.setAttribute('aria-invalid', 'true');
+        estado('Escribe tu correo o usuario y tu contraseña para entrar.', 'error');
+        (!correo ? campoCorreo : campoClave).focus();
+        return;
+      }
+
+      // Si no tiene @, es el usuario del alumno (juan0001)
+      if (!correo.includes('@')) {
+        correo = correo.toLowerCase().replace(/\s+/g, '') + DOMINIO_ALUMNOS;
+      }
+
+      estado('Entrando...', 'info');
+      $('btnEntrar').disabled = true;
+      const { error } = await cliente.auth.signInWithPassword({ email: correo, password: clave });
+      $('btnEntrar').disabled = false;
+      if (error) {
+        campoCorreo.setAttribute('aria-invalid', 'true');
+        campoClave.setAttribute('aria-invalid', 'true');
+        estado('El usuario o la contraseña no son correctos. Revísalos e inténtalo otra vez.', 'error');
+        campoClave.focus();
+        return;
+      }
+
+      const ctx = await App.cargarPerfil();
+      if (!ctx || !ctx.perfil) {
+        estado('Entraste, pero tu cuenta todavía no tiene un perfil. Habla con la secretaría del liceo.', 'error');
+        return;
+      }
+
+      try { sessionStorage.removeItem('aviso_tareas_visto'); } catch (e) {}   // para que salga el aviso de tareas pendientes
+      estado('¡Bienvenido(a), ' + ctx.perfil.nombre + '!', 'ok');
+
+      if (ctx.perfil.cambiar_clave) { location.href = 'cambiar_clave.html'; return; }   // primer ingreso
+      const roles = ctx.roles.filter(r => App.RUTAS[r]);
+      if (roles.length === 0) {
+        estado('Tu cuenta no tiene un rol asignado. Habla con la secretaría del liceo.', 'error');
+      } else if (roles.length === 1) {
+        window.__rolesSesion = roles;
+        irA(roles[0]);
+      } else {
+        mostrarSelector(roles);
+      }
+    }
+    $('vista-acceso').addEventListener('submit', entrar);
+
+    // v3: si ya hay sesión (por ejemplo, al volver aquí para elegir rol), se ofrece elegir
+    // con qué rol entrar sin pedir la contraseña otra vez. Solo lectura.
+    (async function reanudar() {
+      try {
+        const ctx = await App.cargarPerfil();
+        if (!ctx || !ctx.perfil || ctx.perfil.cambiar_clave) return;
+        const roles = ctx.roles.filter(r => App.RUTAS[r]);
+        if (!roles.length) return;
+        mostrarSelector(roles, 'Ya iniciaste sesión, ' + ctx.perfil.nombre + '. Elige con qué rol entrar.');
+      } catch (e) { /* sin sesión: se queda el formulario */ }
+    })();
+  </script>
+  <script src="tema.js"></script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <script src="tema-inicial.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mi Aula</title>
+  <!--
+    v3: "Mi Aula" ya no es una página aparte. El horario y la asistencia están
+    dentro de familia.html (sin recargar), y las tareas se consultan y se entregan
+    dentro de cada materia. Esta página solo redirige para no romper enlaces viejos.
+    No consulta datos ni concede permisos: familia.html hace la comprobación de rol.
+  -->
+  <script src="rol-activo.js"></script>
+  <script>
+    (function () {
+      var h = (location.hash || '').replace('#', '');
+      var destino = h === 'asistencia' ? 'asistencia' : (h === 'tareas' ? 'materias' : 'horario');
+      location.replace('familia.html#' + destino);
+    })();
+  </script>
+</head>
+<body>
+  <main>
+    <h1>Mi Aula</h1>
+    <p>El horario, la asistencia y las tareas ahora están en <a href="familia.html#horario">tu espacio</a>.</p>
+  </main>
+</body>
+</html>

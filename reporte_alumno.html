@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <script src="tema-inicial.js"></script>
+  <script src="listado-alumnos.js" defer></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reporte completo del alumno</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: var(--tp-fondo, #f6efe4); margin: 0; padding: 20px; }
+    .caja { background: white; padding: 20px; border-radius: 12px; max-width: 960px;
+            margin: 0 auto 16px; box-shadow: 0 6px 20px rgba(124, 45, 18,0.12);
+            border-top: 5px solid var(--tp-principal, #7c2d12); border-left: 6px solid var(--tp-principal, #7c2d12); box-sizing: border-box; }
+    h1, h2, h3 { color: var(--tp-principal, #7c2d12); margin-top: 0; }
+    select, input, button { padding: 8px; margin: 4px; border-radius: 6px; border: 1px solid #ccc;
+                            font-family: Arial, sans-serif; font-size: 15px; box-sizing: border-box; }
+    button { background: var(--tp-principal, #7c2d12); color: white; border: none; cursor: pointer; padding: 10px 16px; }
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.4; cursor: default; }
+    button.sec { background: #e2e8f0; color: #1e293b; }
+    .barra { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .chip { display: inline-block; background: var(--tp-suave, #fbf3e8); color: var(--tp-principal, #7c2d12); border: 1px solid var(--tp-borde, #e0c49a);
+            border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: bold;
+            text-transform: uppercase; letter-spacing: 0.06em; }
+    .desliza { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ddd; padding: 5px 6px; font-size: 14px; text-align: center; }
+    th { background: var(--tp-principal, #7c2d12); color: white; }
+    .izq { text-align: left; }
+    .peq { color: #475569; font-size: 13px; }
+    .rojo { color: #b91c1c; font-weight: bold; }
+    .final { font-weight: bold; }
+    .cuadros { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+    .cuadro { flex: 1; min-width: 100px; text-align: center; background: var(--tp-papel, #fffaf3); border: 1px solid #e2e8f0;
+              border-radius: 10px; padding: 10px; font-size: 13px; }
+    .cuadro b { display: block; font-size: 24px; color: var(--tp-principal, #7c2d12); }
+    #estado { font-size: 14px; }
+  </style>
+  <link rel="stylesheet" href="diseno.css">
+</head>
+<body>
+
+  <div class="caja">
+    <div class="barra">
+      <div>
+        <span class="chip" id="chipRol">Reporte</span>
+        <h1>Reporte completo del alumno</h1>
+        <p id="saludo">Cargando...</p>
+      </div>
+      <div>
+        <button class="sec" id="btnVolver">← Volver</button>
+        <button onclick="salir()">Cerrar sesión</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- v3: diseño nuevo del reporte. Mismos datos y mismo PDF que la versión original. -->
+  <section class="caja" aria-labelledby="hElegir">
+    <h2 id="hElegir">Elegir alumno</h2>
+    <div class="reporte-elige">
+      <label for="curso">Curso <select id="curso" onchange="cargarAlumnos()"></select></label>
+      <label for="alumno">Alumno <select id="alumno" onchange="cargarReporte()"></select></label>
+    </div>
+    <p class="peq">Elige el curso y luego el alumno. Verás todas sus materias con la nota de cada período (P1 a P4),
+      las recuperaciones (RP), el promedio de cada bloque de competencias, la calificación final y la asistencia en días.
+      Después puedes descargarlo en PDF.</p>
+    <p class="peq" id="estadoCursos" role="status" aria-live="polite"></p>
+    <div class="listado-descarga">
+      <button type="button" class="btn-listado sin-tema" id="btnDescargarListado" onclick="descargarListadoAlumnos()" aria-describedby="ayudaListado"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42l3.3 3.3V4a1 1 0 0 1 1-1zM5 19h14a1 1 0 1 1 0 2H5a1 1 0 1 1 0-2z"/></svg> Descargar listado de alumnos</button>
+      <p class="peq ayuda-listado" id="ayudaListado">Baja un archivo para Excel (CSV) con: No., matrícula, apellidos, nombres y curso. Es la lista del curso elegido, no el reporte de notas. Tiene datos personales: guárdalo con cuidado.</p>
+      <p class="estado-listado" id="estadoListado" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <section class="caja" id="cajaReporte" style="display:none" aria-labelledby="tituloReporte">
+    <div class="reporte-cabecera">
+      <div>
+        <h2 id="tituloReporte"></h2>
+        <p class="peq" id="datosReporte"></p>
+      </div>
+      <div>
+        <button id="btnPdf" type="button" onclick="descargarPDF()">Descargar reporte en PDF</button>
+        <p id="estado" role="status" aria-live="polite"></p>
+      </div>
+    </div>
+    <div id="vista" aria-live="off"></div>
+  </section>
+
+    <script src="rol-activo.js"></script>
+    <script src="diseno.js"></script>
+  <script>Diseno.montar({grupoDinamico:true, pagina:"reporte_alumno.html"});</script>
+<script>
+    const SUPABASE_URL = 'https://twhdnaiwxpilrevngxkk.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_lEIcvZOVtVD9HIK8HFwRtg_ik68D5Ad';
+    const cliente = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // v4: las 4 columnas guardadas (competencia 1 a 4) se muestran como 4 bloques (pendiente de confirmar).
+    const COMPETENCIAS = [
+      [1, 'Bloque 1: Comunicativa'],
+      [2, 'Bloque 2: Pensamiento Lógico, Creativo y Crítico; Resolución de Problemas'],
+      [3, 'Bloque 3: Científica y Tecnológica; Ambiental y de la Salud'],
+      [4, 'Bloque 4: Ética y Ciudadana; Desarrollo Personal y Espiritual']
+    ];
+    const LEYENDA_BLOQUES = 'Bloque 1: Comunicativa. Bloque 2: Pensamiento Lógico, Creativo y Crítico; Resolución de Problemas. ' +
+      'Bloque 3: Científica y Tecnológica; Ambiental y de la Salud. Bloque 4: Ética y Ciudadana; Desarrollo Personal y Espiritual.';
+    const PERIODOS = [1, 2, 3, 4];
+    const NOMBRE_ESTADO = { presente: 'Presente', ausente: 'Ausente', tardanza: 'Tardanza', excusa: 'Excusa' };
+    const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio',
+                   'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+    let rol = '', alumnosCurso = [], datos = null;
+
+    function esc(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    function fmtFecha(f) { return f ? f.split('-').reverse().join('/') : ''; }
+    function estado(msg, color) {
+      const e = document.getElementById('estado');
+      e.style.color = color === 'red' ? '#b91c1c' : color === 'green' ? '#15803d' : (color || '#334155');
+      e.setAttribute('role', color === 'red' ? 'alert' : 'status');
+      e.textContent = msg || '';
+    }
+    function limpiarNombre(s) {
+      return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_|_$/g, '');
+    }
+    function txt(v) { return v === null || v === undefined ? '' : String(v); }
+
+    async function traerTodo(construir) {
+      let todo = [], desde = 0;
+      const paso = 1000;
+      while (true) {
+        const { data, error } = await construir().range(desde, desde + paso - 1);
+        if (error) throw error;
+        todo = todo.concat(data || []);
+        if (!data || data.length < paso) break;
+        desde += paso;
+      }
+      return todo;
+    }
+
+    // ===== Inicio: solo admin y profesor =====
+    async function iniciar() {
+      const { data: { session } } = await cliente.auth.getSession();
+      if (!session) { location.href = 'index.html'; return; }
+      const { data: perfil } = await cliente.from('perfiles')
+        .select('nombre, apellido, rol').eq('id', session.user.id).single();
+      const _ex = await cliente.from('roles_adicionales').select('rol').eq('perfil_id', session.user.id);
+      const _roles = perfil ? [perfil.rol].concat((_ex.data || []).map(x => x.rol)) : [];
+      if (!perfil || (!_roles.includes('admin') && !_roles.includes('profesor'))) {
+        // v3: sin alerta; vuelve al inicio del rol activo (o a elegir rol)
+        if (perfil && window.RolActivo && RolActivo.alInicio(_roles)) return;
+        alert('Esta página es solo para administración y profesores');
+        location.href = 'index.html'; return;
+      }
+      const visual = RolActivo.preparar({ perfil: perfil, roles: _roles }, 'reporte_alumno.html');
+      if (!visual) return;
+      rol = visual.rol;
+      // No se elige admin solo porque la cuenta lo tenga: se respeta el rol con el que entró.
+      RolActivo.aplicarDiseno(visual, session.user.id);
+      document.getElementById('chipRol').textContent = visual.etiqueta;
+      document.getElementById('saludo').textContent = visual.etiqueta + ': ' + visual.nombre;
+      document.getElementById('btnVolver').onclick = () =>
+        location.href = RolActivo.rutas()[rol] || 'profesor.html';
+
+      let cursos = [], errCursos = null;
+      if (rol === 'admin') {
+        const { data, error } = await cliente.from('cursos').select('id, grado, seccion')
+          .order('grado').order('seccion');
+        errCursos = error;
+        cursos = (data || []).map(c => ({ id: c.id, nombre: c.grado + ' ' + c.seccion }));
+      } else {
+        const { data, error } = await cliente.from('asignaturas')
+          .select('curso_id, cursos(grado, seccion)').eq('profesor_id', session.user.id);
+        errCursos = error;
+        const vistos = new Set();
+        (data || []).forEach(a => {
+          if (!vistos.has(a.curso_id) && a.cursos) {
+            vistos.add(a.curso_id);
+            cursos.push({ id: a.curso_id, nombre: a.cursos.grado + ' ' + a.cursos.seccion });
+          }
+        });
+      }
+      const sel = document.getElementById('curso');
+      // v4: ya no se oculta la causa cuando la lista sale vacía
+      const avisoCursos = document.getElementById('estadoCursos');
+      if (errCursos) {
+        sel.add(new Option('No se pudieron cargar los cursos', ''));
+        avisoCursos.textContent = 'No se pudieron cargar los cursos (' + errCursos.message + '). Revisa tu conexión y vuelve a abrir la página.';
+        return;
+      }
+      if (!cursos.length) {
+        sel.add(new Option('No hay cursos disponibles', ''));
+        avisoCursos.textContent = (rol === 'admin'
+          ? 'Todavía no hay cursos creados. Créalos en «Cursos y alumnos».'
+          : 'La cuenta ' + (session.user.email || '') + ' no tiene materias asignadas, por eso no aparece ningún curso. Pide a la administración que te asigne en «Materias y profesores».') +
+          (location.protocol === 'file:' ? ' Si abriste la plataforma como archivo, ábrela desde el sitio publicado o un servidor (http).' : '');
+        return;
+      }
+      cursos.forEach(c => sel.add(new Option(c.nombre, c.id)));
+      cargarAlumnos();
+    }
+
+    async function cargarAlumnos() {
+      const cursoId = Number(document.getElementById('curso').value);
+      const sel = document.getElementById('alumno');
+      sel.innerHTML = '';
+      document.getElementById('cajaReporte').style.display = 'none';
+      datos = null;
+      if (!cursoId) return;
+      const { data } = await cliente.from('estudiantes')
+        .select('id, matricula, nombre, apellido, curso_id, orden')
+        .eq('curso_id', cursoId).order('orden', { nullsFirst: false }).order('apellido');
+      alumnosCurso = data || [];
+      if (!alumnosCurso.length) { sel.add(new Option('Este curso no tiene alumnos', '')); return; }
+      alumnosCurso.forEach(a => sel.add(new Option(a.apellido + ', ' + a.nombre, a.id)));
+      cargarReporte();
+    }
+
+    // ===== Cálculos (mismas reglas que familia.html) =====
+    function notaQueCuenta(r, p) {
+      if (!r) return null;
+      const pNota = r['p' + p] ?? null;
+      const rp = r['rp' + p] ?? null;
+      if (pNota === null) return null;
+      if (pNota < 70 && rp !== null) return Number(rp);
+      return Number(pNota);
+    }
+    function promedio(lista) {
+      const v = lista.filter(x => x !== null);
+      return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null;
+    }
+
+    async function cargarReporte() {
+      const id = Number(document.getElementById('alumno').value);
+      const alumno = alumnosCurso.find(a => a.id === id);
+      const caja = document.getElementById('cajaReporte');
+      if (!alumno) { caja.style.display = 'none'; datos = null; return; }
+      estado('Cargando...');
+      caja.style.display = '';
+      try {
+        const cursoSel = document.getElementById('curso');
+        const cursoNombre = cursoSel.options[cursoSel.selectedIndex].text;
+        const [m, n, a] = await Promise.all([
+          cliente.from('asignaturas').select('id, nombre').eq('curso_id', alumno.curso_id)
+            .order('orden', { nullsFirst: false }).order('nombre'),
+          cliente.from('calificaciones').select('*').eq('estudiante_id', alumno.id),
+          traerTodo(() => cliente.from('asistencias').select('fecha, estado, observacion')
+            .eq('estudiante_id', alumno.id).order('fecha'))
+        ]);
+        if (m.error) throw m.error;
+        if (n.error) throw n.error;
+        datos = armar(alumno, cursoNombre, m.data || [], n.data || [], a);
+        pintarVista();
+        estado('');
+      } catch (error) {
+        console.error(error);
+        estado('Error: ' + (error.message || error), 'red');
+      }
+    }
+
+    function armar(alumno, cursoNombre, mats, notas, asis) {
+      const materias = mats.map(mt => {
+        const comps = COMPETENCIAS.map(([c, nombre]) => {
+          const r = notas.find(x => x.asignatura_id === mt.id && x.competencia === c);
+          return {
+            c, nombre,
+            p: PERIODOS.map(p => r && r['p' + p] !== null && r['p' + p] !== undefined ? Number(r['p' + p]) : null),
+            rp: PERIODOS.map(p => r && r['rp' + p] !== null && r['rp' + p] !== undefined ? Number(r['rp' + p]) : null),
+            pc: promedio(PERIODOS.map(p => notaQueCuenta(r, p)))
+          };
+        });
+        const pcs = comps.map(x => x.pc).filter(x => x !== null);
+        const final = pcs.length ? Math.round(pcs.reduce((s, x) => s + x, 0) / pcs.length) : null;
+        return { nombre: mt.nombre, comps, final };
+      });
+      const finales = materias.map(x => x.final).filter(x => x !== null);
+      const general = finales.length ? Math.round(finales.reduce((s, x) => s + x, 0) / finales.length) : null;
+
+      const total = { presente: 0, ausente: 0, tardanza: 0, excusa: 0 };
+      const porMes = {};
+      const faltas = [];
+      asis.forEach(x => {
+        if (total[x.estado] === undefined) return;
+        total[x.estado]++;
+        const k = x.fecha.slice(0, 7);
+        porMes[k] = porMes[k] || { presente: 0, ausente: 0, tardanza: 0, excusa: 0 };
+        porMes[k][x.estado]++;
+        if (x.estado !== 'presente') faltas.push(x);
+      });
+      return { alumno, cursoNombre, materias, general, total, porMes, faltas, dias: asis.length };
+    }
+
+    function f1(v) { return v === null ? '—' : v.toFixed(1); }
+    function rojoSi(v) { return v !== null && v !== '' && !isNaN(v) && Number(v) < 70 ? ' class="rojo"' : ''; }
+
+    function pintarVista() {
+      const d = datos;
+      document.getElementById('tituloReporte').textContent = d.alumno.apellido + ', ' + d.alumno.nombre;
+      document.getElementById('datosReporte').textContent =
+        'Matrícula: ' + d.alumno.matricula + ' · Curso: ' + d.cursoNombre;
+
+      const bajas = d.materias.filter(m => m.final !== null && m.final < 70);
+      const tarjeta = (cifra, rotulo, alerta) => '<div class="diseno-tarjeta"><span class="cifra' + (alerta ? ' alerta' : '') + '">' +
+        cifra + '</span><span class="rotulo">' + rotulo + '</span></div>';
+      let html = '<div class="diseno-tarjetas">' +
+        tarjeta(d.general === null ? '—' : d.general, 'Promedio general', d.general !== null && d.general < 70) +
+        tarjeta(bajas.length, 'Materias por debajo de 70', bajas.length > 0) +
+        tarjeta(d.total.ausente, 'Ausencias', d.total.ausente > 0) +
+        tarjeta(d.total.tardanza, 'Tardanzas') +
+        tarjeta(d.dias, 'Días registrados') + '</div>';
+
+      html += '<h3>Resumen de calificaciones</h3><div class="desliza"><table><caption>Resumen de calificaciones de ' +
+        esc(d.alumno.apellido + ', ' + d.alumno.nombre) + '</caption><thead><tr>' +
+        '<th class="izq" scope="col">Materia</th><th scope="col">Bloque 1</th><th scope="col">Bloque 2</th><th scope="col">Bloque 3</th><th scope="col">Bloque 4</th><th scope="col">Final</th></tr></thead><tbody>';
+      d.materias.forEach(m => {
+        html += '<tr><th scope="row" class="izq">' + esc(m.nombre) + '</th>' +
+          m.comps.map(c => '<td' + rojoSi(c.pc) + '>' + f1(c.pc) + '</td>').join('') +
+          '<td class="final"' + rojoSi(m.final) + '>' + (m.final === null ? '—' : m.final) + '</td></tr>';
+      });
+      html += '<tr><th scope="row" colspan="5" style="text-align:right">Promedio general</th><td class="final"' +
+        rojoSi(d.general) + '>' + (d.general === null ? '—' : d.general) + '</td></tr></tbody></table></div>' +
+        '<p class="peq">Cada bloque es el promedio de sus competencias. ' + esc(LEYENDA_BLOQUES) + ' Si la nota del período (P) es menor de 70 y hay recuperación (RP), cuenta la RP. Menos de 70 se ve en rojo.</p>';
+
+      html += '<h3>Detalle por materia</h3>';
+      d.materias.forEach(m => {
+        html += '<details class="reporte-materia"><summary>' + esc(m.nombre) + ' — final: ' + (m.final === null ? '—' : m.final) + '</summary>' +
+          '<div class="desliza"><table><caption>' + esc(m.nombre) + ': notas por bloque y período</caption><thead><tr><th class="izq" scope="col">Bloque de competencias</th>' +
+          PERIODOS.map(p => '<th scope="col">P' + p + '</th><th scope="col">RP' + p + '</th>').join('') + '<th scope="col"><abbr title="Promedio del bloque">Prom.</abbr></th></tr></thead><tbody>' +
+          m.comps.map(c => '<tr><th scope="row" class="izq">' + esc(c.nombre) + '</th>' +
+            PERIODOS.map((p, i) => '<td' + rojoSi(c.p[i]) + '>' + esc(txt(c.p[i])) + '</td><td' + rojoSi(c.rp[i]) + ' style="background:#f5ede0">' + esc(txt(c.rp[i])) + '</td>').join('') +
+            '<td' + rojoSi(c.pc) + '>' + f1(c.pc) + '</td></tr>').join('') +
+          '</tbody></table></div></details>';
+      });
+
+      html += '<h3>Asistencia (cantidad de días)</h3><div class="cuadros">' +
+        '<div class="cuadro"><b>' + d.total.presente + '</b>Presentes</div>' +
+        '<div class="cuadro"><b>' + d.total.ausente + '</b>Ausencias</div>' +
+        '<div class="cuadro"><b>' + d.total.tardanza + '</b>Tardanzas</div>' +
+        '<div class="cuadro"><b>' + d.total.excusa + '</b>Excusas</div>' +
+        '<div class="cuadro"><b>' + d.dias + '</b>Días registrados</div></div>';
+      const meses = Object.keys(d.porMes).sort();
+      if (meses.length) {
+        html += '<div class="desliza"><table><caption>Asistencia por mes</caption><thead><tr><th scope="col" class="izq">Mes</th><th scope="col">Presentes</th><th scope="col">Ausencias</th><th scope="col">Tardanzas</th><th scope="col">Excusas</th><th scope="col">Total</th></tr></thead><tbody>' +
+          meses.map(k => {
+            const c = d.porMes[k];
+            const [a, mm] = k.split('-').map(Number);
+            return '<tr><th scope="row" class="izq">' + MESES[mm - 1] + ' ' + a + '</th><td>' + c.presente + '</td><td>' + c.ausente +
+              '</td><td>' + c.tardanza + '</td><td>' + c.excusa + '</td><td>' + (c.presente + c.ausente + c.tardanza + c.excusa) + '</td></tr>';
+          }).join('') + '</tbody></table></div>';
+      }
+      html += '<details class="reporte-materia"><summary>Detalle de ausencias, tardanzas y excusas (' + d.faltas.length + ')</summary>' +
+        (d.faltas.length
+          ? '<div class="desliza"><table><caption>Ausencias, tardanzas y excusas</caption><thead><tr><th scope="col">Fecha</th><th scope="col">Registro</th><th scope="col" class="izq">Observación</th></tr></thead><tbody>' +
+            d.faltas.map(x => '<tr><td>' + esc(fmtFecha(x.fecha)) + '</td><td>' + esc(NOMBRE_ESTADO[x.estado]) + '</td><td class="izq">' + esc(x.observacion || '') + '</td></tr>').join('') +
+            '</tbody></table></div>'
+          : '<p class="peq">' + (d.dias ? 'No hay ausencias, tardanzas ni excusas registradas.' : 'Todavía no hay asistencia registrada.') + '</p>') +
+        '</details>';
+      document.getElementById('vista').innerHTML = html;
+    }
+
+    // ===== PDF =====
+    function descargarPDF() {
+      if (!datos) return;
+      if (!window.jspdf) { estado('No se cargó la librería de PDF. Revisa tu conexión a internet.', 'red'); return; }
+      try {
+        const d = datos;
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const ANCHO = doc.internal.pageSize.getWidth();
+        const ALTO = doc.internal.pageSize.getHeight();
+        const AZUL = [30, 58, 138];
+
+        const estiloBase = {
+          theme: 'grid',
+          margin: { left: 10, right: 10, bottom: 16 },
+          styles: { fontSize: 8, cellPadding: 1.6, halign: 'center', valign: 'middle', lineColor: [200, 205, 215], lineWidth: 0.1 },
+          headStyles: { fillColor: AZUL, textColor: 255, fontStyle: 'bold' }
+        };
+        // Notas menores de 70 en rojo
+        const rojoBajas = data => {
+          if (data.section !== 'body' || data.column.index === 0) return;
+          const t = (data.cell.text[0] || '').trim();
+          if (t !== '' && !isNaN(t) && Number(t) < 70) {
+            data.cell.styles.textColor = [185, 28, 28];
+            data.cell.styles.fontStyle = 'bold';
+          }
+        };
+        const subtitulo = (texto, y) => {
+          if (y > ALTO - 40) { doc.addPage(); y = 16; }
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(...AZUL);
+          doc.text(texto, 10, y);
+          return y + 3;
+        };
+
+        // Encabezado
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(...AZUL);
+        doc.text('Liceo Experimental María Mercedes López López', ANCHO / 2, 14, { align: 'center' });
+        doc.setFontSize(11);
+        doc.text('Reporte completo de calificaciones y asistencia', ANCHO / 2, 20, { align: 'center' });
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(51, 65, 85);
+        doc.text('Estudiante: ' + d.alumno.apellido + ', ' + d.alumno.nombre, 10, 29);
+        doc.text('Matrícula: ' + d.alumno.matricula + '     Curso: ' + d.cursoNombre, 10, 34);
+        doc.text('Emitido el ' + new Date().toLocaleDateString('es-DO'), ANCHO - 10, 29, { align: 'right' });
+
+        // 1. Resumen
+        let y = subtitulo('Resumen de calificaciones', 43);
+        const bodyRes = d.materias.map(m =>
+          [m.nombre].concat(m.comps.map(c => f1(c.pc)), [m.final === null ? '—' : String(m.final)]));
+        bodyRes.push([
+          { content: 'Promedio general', colSpan: 5, styles: { halign: 'right', fontStyle: 'bold' } },
+          { content: d.general === null ? '—' : String(d.general), styles: { fontStyle: 'bold' } }
+        ]);
+        doc.autoTable(Object.assign({}, estiloBase, {
+          startY: y,
+          head: [['Materia', 'Bloque 1', 'Bloque 2', 'Bloque 3', 'Bloque 4', 'Final']],
+          body: bodyRes,
+          columnStyles: { 0: { halign: 'left', cellWidth: 70 } },
+          didParseCell: rojoBajas
+        }));
+        y = doc.lastAutoTable.finalY + 4;
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(71, 85, 105);
+        const nota = 'Cada bloque es el promedio de sus competencias. ' + LEYENDA_BLOQUES +
+          ' Si P es menor de 70 y existe RP, cuenta el RP. Las notas menores de 70 se muestran en rojo.';
+        const lineas = doc.splitTextToSize(nota, ANCHO - 20);
+        doc.text(lineas, 10, y);
+        y += lineas.length * 3.4 + 6;
+
+        // 2. Detalle por materia
+        y = subtitulo('Detalle por materia (P, RP y promedio del bloque)', y);
+        d.materias.forEach(m => {
+          const body = m.comps.map(c => {
+            const fila = [c.nombre];
+            PERIODOS.forEach((p, i) => { fila.push(txt(c.p[i]), txt(c.rp[i])); });
+            fila.push(f1(c.pc));
+            return fila;
+          });
+          body.push([
+            { content: 'Calificación final', colSpan: 9, styles: { halign: 'right', fontStyle: 'bold' } },
+            { content: m.final === null ? '—' : String(m.final), styles: { fontStyle: 'bold' } }
+          ]);
+          doc.autoTable(Object.assign({}, estiloBase, {
+            startY: y + 2,
+            head: [
+              [{ content: m.nombre, colSpan: 10, styles: { halign: 'left', fillColor: [51, 78, 160] } }],
+              ['Bloque de competencias', 'P1', 'RP1', 'P2', 'RP2', 'P3', 'RP3', 'P4', 'RP4', 'Prom.']
+            ],
+            body,
+            columnStyles: { 0: { halign: 'left', cellWidth: 62 } },
+            didParseCell: data => {
+              rojoBajas(data);
+              // RP en gris para distinguirlos de P
+              if (data.section === 'body' && data.column.index > 0 && data.column.index < 9 && data.column.index % 2 === 0 &&
+                  data.row.raw.length === 10) data.cell.styles.fillColor = [241, 245, 249];
+            },
+            rowPageBreak: 'avoid'
+          }));
+          y = doc.lastAutoTable.finalY + 5;
+        });
+
+        // 3. Asistencia (cantidad)
+        y = subtitulo('Estadística de asistencia (cantidad de días)', y);
+        doc.autoTable(Object.assign({}, estiloBase, {
+          startY: y + 2,
+          head: [['Presentes', 'Ausencias', 'Tardanzas', 'Excusas', 'Total de días registrados']],
+          body: [[d.total.presente, d.total.ausente, d.total.tardanza, d.total.excusa, d.dias].map(String)],
+          styles: Object.assign({}, estiloBase.styles, { fontSize: 10, fontStyle: 'bold' })
+        }));
+        y = doc.lastAutoTable.finalY + 6;
+
+        const meses = Object.keys(d.porMes).sort();
+        if (meses.length) {
+          y = subtitulo('Asistencia por mes', y);
+          const bodyMes = meses.map(k => {
+            const c = d.porMes[k];
+            const [a, mm] = k.split('-').map(Number);
+            return [MESES[mm - 1] + ' ' + a, c.presente, c.ausente, c.tardanza, c.excusa,
+              c.presente + c.ausente + c.tardanza + c.excusa].map(String);
+          });
+          doc.autoTable(Object.assign({}, estiloBase, {
+            startY: y + 2,
+            head: [['Mes', 'Presentes', 'Ausencias', 'Tardanzas', 'Excusas', 'Total']],
+            body: bodyMes,
+            columnStyles: { 0: { halign: 'left' } }
+          }));
+          y = doc.lastAutoTable.finalY + 6;
+        }
+
+        y = subtitulo('Detalle de ausencias, tardanzas y excusas', y);
+        if (d.faltas.length) {
+          doc.autoTable(Object.assign({}, estiloBase, {
+            startY: y + 2,
+            head: [['Fecha', 'Registro', 'Observación']],
+            body: d.faltas.map(x => [fmtFecha(x.fecha), NOMBRE_ESTADO[x.estado], x.observacion || '']),
+            columnStyles: { 0: { cellWidth: 30 }, 1: { cellWidth: 35 }, 2: { halign: 'left' } }
+          }));
+        } else {
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(71, 85, 105);
+          doc.text(d.dias ? 'No hay ausencias, tardanzas ni excusas registradas.' : 'Todavía no hay asistencia registrada.', 10, y + 6);
+        }
+
+        const n = doc.getNumberOfPages();
+        for (let p = 1; p <= n; p++) {
+          doc.setPage(p);
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(100, 116, 139);
+          doc.text(d.alumno.apellido + ', ' + d.alumno.nombre + ' · ' + d.cursoNombre, 10, ALTO - 7);
+          doc.text('Página ' + p + ' de ' + n, ANCHO - 10, ALTO - 7, { align: 'right' });
+        }
+
+        doc.save('reporte_' + limpiarNombre(d.alumno.apellido + '_' + d.alumno.nombre) + '_' + limpiarNombre(d.alumno.matricula) + '.pdf');
+        estado('PDF descargado ✔', 'green');
+      } catch (error) {
+        console.error(error);
+        estado('No se pudo generar el PDF: ' + (error.message || error), 'red');
+      }
+    }
+
+    async function salir() {
+      if (window.App && App.salir) return App.salir();
+      try { sessionStorage.removeItem('rol_activo'); } catch (e) {}
+      await cliente.auth.signOut();
+      location.href = 'index.html';
+    }
+
+    iniciar();
+  </script>
+  <script>
+    /* v4.1.1: Descargar listado de alumnos (CSV). Solo usa lo que esta página ya cargó. */
+    function descargarListadoAlumnos() {
+      if (!window.DescargaListados) { alert('Falta el archivo listado-alumnos.js en la carpeta de la plataforma.'); return; }
+      DescargaListados.descargarAlumnos(alumnosCurso, {
+        curso: DescargaListados.textoCurso('curso'),
+        mensajeVacio: 'No hay alumnos en este curso para descargar. Elige un curso primero.'
+      });
+    }
+  </script>
+  <script src="tema.js"></script>
+</body>
+</html>

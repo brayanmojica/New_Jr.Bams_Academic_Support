@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <script src="tema-inicial.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Avisos</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: var(--tp-fondo, #f6efe4); margin: 0; padding: 20px; }
+    .caja { background: white; padding: 20px; border-radius: 12px; max-width: 960px;
+            margin: 0 auto 16px; box-shadow: 0 6px 20px rgba(124, 45, 18,0.12);
+            border-top: 5px solid var(--tp-principal, #7c2d12); border-left: 6px solid var(--tp-principal, #7c2d12); box-sizing: border-box; }
+    h1, h2, h3 { color: var(--tp-principal, #7c2d12); margin-top: 0; }
+    select, input, textarea, button { padding: 8px; margin: 4px 0; border-radius: 6px; border: 1px solid #ccc;
+                            font-family: Arial, sans-serif; font-size: 15px; box-sizing: border-box; }
+    input[type=text], textarea { width: 100%; }
+    button { background: var(--tp-principal, #7c2d12); color: white; border: none; cursor: pointer; padding: 10px 16px; margin-right: 6px; }
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.4; cursor: default; }
+    button.sec { background: #e2e8f0; color: #1e293b; }
+    button.peligro { background: #dc2626; }
+    .barra { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .chip { display: inline-block; background: var(--tp-suave, #fbf3e8); color: var(--tp-principal, #7c2d12); border: 1px solid var(--tp-borde, #e0c49a);
+            border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: bold;
+            text-transform: uppercase; letter-spacing: 0.06em; }
+    .fila { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; margin: 6px 0; }
+    .fila label { font-size: 14px; }
+    .peq { color: #475569; font-size: 13px; }
+    .aviso { border: 1px solid #e2e8f0; border-left: 4px solid var(--tp-principal, #7c2d12); border-radius: 10px;
+             padding: 12px 14px; margin: 10px 0; background: var(--tp-papel, #fffaf3); }
+    .aviso.imp { border-left-color: #dc2626; background: #fef2f2; }
+    .aviso.vencido { opacity: 0.6; }
+    .aviso p { margin: 6px 0; }
+    .etq { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px;
+           font-weight: bold; background: #e2e8f0; margin-left: 6px; }
+    .etq.imp { background: #fee2e2; color: #b91c1c; }
+    .etq.dest { background: var(--tp-suave2, #f3e0c6); color: var(--tp-principal, #7c2d12); }
+    #estado { font-size: 14px; }
+    /* v4: editor con formato (el mismo de las tareas, sin imágenes) */
+    .editor { border: 1px solid #8c7a5b; border-radius: 8px; margin: 4px 0; background: white; }
+    .barra-ed { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 6px;
+                background: var(--tp-fondo, #f6efe4); border-bottom: 1px solid #d6c4a8; border-radius: 8px 8px 0 0; }
+    .barra-ed button { margin: 0; padding: 6px 10px; font-size: 13px; }
+    .barra-ed .sep { width: 1px; height: 22px; background: #d6c4a8; margin: 0 4px; }
+    .barra-ed .color { width: auto; min-width: 28px; height: 28px; padding: 0 7px; border-radius: 6px;
+                       border: 1px solid #d6c4a8; background: #fff !important; box-shadow: none; font-weight: 700; }
+    .barra-ed .color[data-color="#111827"] span { color: #111827 !important; }
+    .barra-ed .color[data-color="#dc2626"] span { color: #dc2626 !important; }
+    .barra-ed .color[data-color="#1d4ed8"] span { color: #1d4ed8 !important; }
+    .barra-ed .color[data-color="#15803d"] span { color: #15803d !important; }
+    .area-ed { min-height: 110px; max-height: 360px; overflow-y: auto; padding: 10px; outline: none; font-size: 15px; }
+    .area-ed:empty:before { content: attr(data-ph); color: #57534e; }
+    .aviso .contenido-rico p { margin: 4px 0; }
+  </style>
+  <link rel="stylesheet" href="diseno.css">
+</head>
+<body>
+
+  <div class="caja">
+    <div class="barra">
+      <div>
+        <span class="chip" id="chipRol">Avisos</span>
+        <h1>Avisos y comunicados</h1>
+        <p id="saludo">Cargando...</p>
+      </div>
+      <div>
+        <button class="sec" id="btnVolver">← Volver</button>
+        <button onclick="salir()">Cerrar sesión</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="caja">
+    <h2>Publicar un aviso nuevo</h2>
+    <label class="peq" for="destino">Para quién:</label><br>
+    <select id="destino"></select>
+    <input type="text" id="titulo" aria-label="Título del aviso" maxlength="150" placeholder="Título del aviso">
+    <span class="peq" id="lblMensaje">Mensaje</span>
+    <div class="editor">
+      <div class="barra-ed" role="toolbar" aria-label="Formato del mensaje" onmousedown="if (event.target.closest('button')) event.preventDefault()">
+        <button type="button" class="sec" title="Negrita" onclick="cmd('bold')"><b>Negrita</b></button>
+        <button type="button" class="sec" title="Cursiva" onclick="cmd('italic')"><i>Cursiva</i></button>
+        <button type="button" class="sec" title="Subrayado" onclick="cmd('underline')"><u>Subrayado</u></button>
+        <button type="button" class="sec" title="Tachado" onclick="cmd('strikeThrough')"><s>Tachado</s></button>
+        <span class="sep"></span>
+        <button type="button" class="sec" title="Letra pequeña" onclick="cmd('fontSize', '2')" style="font-size:11px">Pequeña</button>
+        <button type="button" class="sec" title="Letra normal" onclick="cmd('fontSize', '3')">Normal</button>
+        <button type="button" class="sec" title="Letra grande" onclick="cmd('fontSize', '5')" style="font-size:16px">Grande</button>
+        <span class="sep"></span>
+        <button type="button" class="color" data-color="#111827" title="Texto negro" aria-label="Texto negro" onclick="cmd('foreColor', '#111827')"><span>A</span></button>
+        <button type="button" class="color" data-color="#dc2626" title="Texto rojo" aria-label="Texto rojo" onclick="cmd('foreColor', '#dc2626')"><span>A</span></button>
+        <button type="button" class="color" data-color="#1d4ed8" title="Texto azul" aria-label="Texto azul" onclick="cmd('foreColor', '#1d4ed8')"><span>A</span></button>
+        <button type="button" class="color" data-color="#15803d" title="Texto verde" aria-label="Texto verde" onclick="cmd('foreColor', '#15803d')"><span>A</span></button>
+        <span class="sep"></span>
+        <button type="button" class="sec" title="Lista con viñetas" onclick="cmd('insertUnorderedList')">• Lista</button>
+        <button type="button" class="sec" title="Lista numerada" onclick="cmd('insertOrderedList')">Lista numerada</button>
+        <button type="button" class="sec" title="Quitar el formato del texto seleccionado" onclick="cmd('removeFormat')">Quitar formato</button>
+      </div>
+      <div id="mensaje" class="area-ed contenido-rico" contenteditable="true" role="textbox" aria-multiline="true"
+           aria-labelledby="lblMensaje" data-ph="Escribe el mensaje. Selecciona texto y usa la barra para dar formato."></div>
+    </div>
+    <div class="fila">
+      <label><input type="checkbox" id="importante"> Marcar como importante</label>
+      <label>Se oculta después de: <input type="date" id="expira"></label>
+    </div>
+    <p class="peq">Lo verán los alumnos y sus familias en «Inicio» y dentro de cada materia; la campana les avisa que hay algo nuevo.
+      Si no pones fecha, el aviso se queda visible hasta que lo borres.</p>
+    <button id="btnPublicar" onclick="publicar()">Publicar aviso</button>
+    <span id="estado" role="status" aria-live="polite"></span>
+  </div>
+
+  <div class="caja">
+    <h2>Avisos publicados</h2>
+    <div id="lista"><p class="peq">Cargando...</p></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.7/dist/purify.min.js"></script>
+  <script src="rico.js"></script>
+    <script src="rol-activo.js"></script>
+    <script src="diseno.js"></script>
+  <script>Diseno.montar({grupoDinamico:true, pagina:"avisos.html"});</script>
+<script>
+    const SUPABASE_URL = 'https://twhdnaiwxpilrevngxkk.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_lEIcvZOVtVD9HIK8HFwRtg_ik68D5Ad';
+    const cliente = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let rol = '', uid = '', cursos = [], avisos = [];
+
+    function esc(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    function hoy() {
+      const d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+    function fmtFecha(f) { return f ? f.split('-').reverse().join('/') : ''; }
+    function estado(msg, color) {
+      const e = document.getElementById('estado');
+      e.style.color = color || '#334155'; e.textContent = msg || '';
+    }
+
+    async function iniciar() {
+      const { data: { session } } = await cliente.auth.getSession();
+      if (!session) { location.href = 'index.html'; return; }
+      uid = session.user.id;
+      const { data: perfil } = await cliente.from('perfiles')
+        .select('nombre, apellido, rol').eq('id', uid).single();
+      const _ex = await cliente.from('roles_adicionales').select('rol').eq('perfil_id', session.user.id);
+      const _roles = perfil ? [perfil.rol].concat((_ex.data || []).map(x => x.rol)) : [];
+      if (!perfil || (!_roles.includes('admin') && !_roles.includes('profesor'))) {
+        // v3: sin alerta; vuelve al inicio del rol activo (o a elegir rol)
+        if (perfil && window.RolActivo && RolActivo.alInicio(_roles)) return;
+        alert('Esta página es solo para administración y profesores');
+        location.href = 'index.html'; return;
+      }
+      const visual = RolActivo.preparar({ perfil: perfil, roles: _roles }, 'avisos.html');
+      if (!visual) return;
+      rol = visual.rol;
+      RolActivo.aplicarDiseno(visual, uid);
+      document.getElementById('chipRol').textContent = visual.etiqueta;
+      document.getElementById('saludo').textContent = visual.etiqueta + ': ' + visual.nombre;
+      document.getElementById('btnVolver').onclick = () =>
+        location.href = (RolActivo.rutas()[rol] || (rol === 'admin' || rol === 'coordinador' ? 'admin.html' : 'profesor.html'));
+
+      if (rol === 'admin') {
+        const { data } = await cliente.from('cursos').select('id, grado, seccion').order('grado').order('seccion');
+        cursos = (data || []).map(c => ({ id: Number(c.id), nombre: c.grado + ' ' + c.seccion }));
+      } else {
+        const { data } = await cliente.from('asignaturas')
+          .select('curso_id, cursos(grado, seccion)').eq('profesor_id', uid);
+        const vistos = new Set();
+        (data || []).forEach(a => {
+          if (!vistos.has(a.curso_id) && a.cursos) {
+            vistos.add(a.curso_id);
+            cursos.push({ id: Number(a.curso_id), nombre: a.cursos.grado + ' ' + a.cursos.seccion });
+          }
+        });
+      }
+
+      const sel = document.getElementById('destino');
+      // Solo la administración puede avisar a todo el liceo (curso_id nulo).
+      // Un profesor, aunque tenga también el rol admin en la cuenta, no ve esa
+      // opción si entró como profesor.
+      if (rol === 'admin') sel.add(new Option('Todo el liceo', 'todos'));
+      cursos.forEach(c => sel.add(new Option('Curso ' + c.nombre, c.id)));
+      if (!sel.options.length) {
+        sel.add(new Option('No tienes cursos asignados', ''));
+        document.getElementById('btnPublicar').disabled = true;
+      }
+      cargar();
+    }
+
+    async function cargar() {
+      const { data, error } = await cliente.from('avisos').select('*')
+        .order('creado_en', { ascending: false }).limit(100);
+      if (error) {
+        document.getElementById('lista').innerHTML =
+          '<p class="rojo" style="color:#b91c1c">No se pudieron cargar los avisos: ' + esc(error.message) +
+          '</p><p class="peq">Si el problema sigue, avisa a la administración de la plataforma.</p>';
+        return;
+      }
+      avisos = data || [];
+      dibujar();
+      // v4: al abrir esta página, los avisos cuentan como vistos (se apaga la campana)
+      if (window.Diseno && Diseno.novedades) Diseno.novedades.fijar('avisos', avisos.map(a => ({ id: a.id, fecha: a.creado_en })));
+    }
+
+    function nombreDestino(a) {
+      if (a.curso_id === null) return 'Todo el liceo';
+      const c = cursos.find(x => x.id === Number(a.curso_id));
+      return c ? 'Curso ' + c.nombre : 'Un curso';
+    }
+
+    function dibujar() {
+      const cont = document.getElementById('lista');
+      if (!avisos.length) { cont.innerHTML = '<p class="peq">Todavía no hay avisos publicados.</p>'; return; }
+      const h = hoy();
+      cont.innerHTML = avisos.map(a => {
+        const vencido = a.fecha_expira && a.fecha_expira < h;
+        const puedeBorrar = rol === 'admin' || a.autor_id === uid;
+        const quien = a.autor_nombre
+          ? esc(a.autor_nombre) + (a.autor_rol === 'admin' ? ' (Administración)' : '')
+          : 'Desconocido';
+        return '<div class="aviso' + (a.importante ? ' imp' : '') + (vencido ? ' vencido' : '') + '">' +
+          '<b>' + esc(a.titulo) + '</b>' +
+          (a.importante ? '<span class="etq imp">Importante</span>' : '') +
+          '<span class="etq dest">' + esc(nombreDestino(a)) + '</span>' +
+          (vencido ? '<span class="etq">Vencido</span>' : '') +
+          (window.Rico && Rico.renderTexto ? Rico.renderTexto(a.mensaje) : '<p>' + esc(a.mensaje).replace(/\n/g, '<br>') + '</p>') +
+          '<div class="peq">Por ' + quien + ' · ' + new Date(a.creado_en).toLocaleDateString('es-DO') +
+          (a.fecha_expira ? ' · Visible hasta ' + fmtFecha(a.fecha_expira) : '') + '</div>' +
+          (puedeBorrar ? '<button class="peligro" onclick="borrar(\'' + a.id + '\')">Borrar</button>' : '') +
+          '</div>';
+      }).join('');
+    }
+
+    // ===== v4: editor del mensaje (misma barra que las tareas) =====
+    let rangoEd = null;
+    const editor = () => document.getElementById('mensaje');
+    function guardarRango() {
+      const s = window.getSelection();
+      if (s.rangeCount && editor().contains(s.anchorNode)) rangoEd = s.getRangeAt(0).cloneRange();
+    }
+    function restaurarRango() {
+      const e = editor();
+      e.focus();
+      const s = window.getSelection();
+      s.removeAllRanges();
+      if (rangoEd && e.contains(rangoEd.startContainer)) s.addRange(rangoEd);
+      else { const r = document.createRange(); r.selectNodeContents(e); r.collapse(false); s.addRange(r); }
+    }
+    function cmd(comando, valor) {
+      if (document.activeElement !== editor()) restaurarRango();
+      if (comando === 'foreColor') {
+        const ok = (window.Rico && Rico.normalizarColor) ? Rico.normalizarColor(valor) : '';
+        if (!ok) return;
+        valor = ok;
+      }
+      document.execCommand('styleWithCSS', false, false);
+      document.execCommand(comando, false, valor || null);
+      guardarRango();
+    }
+    document.addEventListener('selectionchange', guardarRango);
+    editor().addEventListener('paste', ev => {
+      ev.preventDefault();
+      const html = ev.clipboardData.getData('text/html');
+      const texto = ev.clipboardData.getData('text/plain');
+      const limpio = html && window.Rico ? Rico.limpiar(html).replace(/<img[^>]*>/gi, '') : '';
+      if (limpio) document.execCommand('insertHTML', false, limpio);
+      else document.execCommand('insertText', false, texto);
+    });
+    /* La columna «mensaje» es de texto. Si el mensaje no tiene formato se guarda como
+       texto normal (igual que antes); si tiene formato se guarda el HTML ya limpio. */
+    function mensajeParaGuardar() {
+      const e = editor();
+      const texto = (e.innerText || '').replace(/\u00a0/g, ' ').trim();
+      if (!texto) return { texto: '', valor: '' };
+      const limpio = window.Rico ? Rico.limpiar(e.innerHTML).replace(/<img[^>]*>/gi, '') : '';
+      const conFormato = /<(b|strong|i|em|u|s|strike|del|font|ul|ol|li|h3|h4|blockquote|a|sub|sup)[\s>]/i.test(limpio);
+      return { texto, valor: conFormato ? limpio : texto };
+    }
+
+    async function publicar() {
+      const titulo = document.getElementById('titulo').value.trim();
+      const msj = mensajeParaGuardar();
+      const mensaje = msj.valor;
+      if (msj.texto.length > 3000) { estado('El mensaje es muy largo (máximo 3000 letras).', 'red'); return; }
+      const destino = document.getElementById('destino').value;
+      const expira = document.getElementById('expira').value;
+      if (!destino) { estado('Elige para quién es el aviso', 'red'); return; }
+      if (!titulo || !mensaje) { estado('Escribe el título y el mensaje', 'red'); return; }
+      if (expira && expira < hoy()) { estado('La fecha para ocultar no puede estar en el pasado', 'red'); return; }
+      if (rol !== 'admin' && destino === 'todos') {
+        estado('Con el rol de profesor no se puede publicar un aviso para todo el liceo', 'red');
+        return;
+      }
+      const cursoDestino = destino === 'todos' ? null : Number(destino);
+      if (rol !== 'admin') {
+        if (cursoDestino === null || !cursos.some(c => Number(c.id) === cursoDestino)) {
+          estado('Solo puedes publicar en los cursos de las materias que tienes asignadas', 'red');
+          return;
+        }
+      }
+
+      const btn = document.getElementById('btnPublicar');
+      btn.disabled = true;
+      estado('Publicando...');
+      const { error } = await cliente.from('avisos').insert({
+        titulo, mensaje,
+        curso_id: rol === 'admin' ? cursoDestino : cursoDestino,
+        importante: document.getElementById('importante').checked,
+        fecha_expira: expira || null
+      });
+      btn.disabled = false;
+      if (error) {
+        estado('No se pudo publicar: ' + (error.message.includes('row-level security')
+          ? 'no tienes permiso para publicar en ese destino.' : error.message), 'red');
+        return;
+      }
+      document.getElementById('titulo').value = '';
+      editor().innerHTML = '';
+      document.getElementById('importante').checked = false;
+      document.getElementById('expira').value = '';
+      estado('Aviso publicado ✔', 'green');
+      cargar();
+    }
+
+    async function borrar(id) {
+      if (!confirm('¿Borrar este aviso? Las familias dejarán de verlo.')) return;
+      const { error } = await cliente.from('avisos').delete().eq('id', id);
+      if (error) { estado('No se pudo borrar: ' + error.message, 'red'); return; }
+      estado('Aviso borrado', 'green');
+      cargar();
+    }
+
+    async function salir() {
+      if (window.App && App.salir) return App.salir();
+      try { sessionStorage.removeItem('rol_activo'); } catch (e) {}
+      await cliente.auth.signOut();
+      location.href = 'index.html';
+    }
+
+    iniciar();
+  </script>
+  <script src="tema.js"></script>
+</body>
+</html>

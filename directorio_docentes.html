@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <script src="tema-inicial.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Directorio de docentes</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <script src="comun.js"></script>
+  <script src="rol-activo.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: var(--tp-fondo, #f6efe4); margin: 0; padding: 20px; }
+    .caja { background: white; padding: 20px; border-radius: 12px; max-width: 1100px; margin: 0 auto 16px;
+            box-shadow: 0 6px 20px rgba(124, 45, 18,0.12); border-top: 5px solid var(--tp-principal, #7c2d12);
+            border-left: 6px solid var(--tp-principal, #7c2d12); box-sizing: border-box; }
+    h1, h2 { color: var(--tp-principal, #7c2d12); margin-top: 0; }
+    input, button { padding: 8px; margin: 4px 0; border-radius: 6px; border: 1px solid #ccc; font-family: Arial, sans-serif; font-size: 14px; box-sizing: border-box; }
+    button { background: var(--tp-principal, #7c2d12); color: white; border: none; cursor: pointer; padding: 9px 14px; margin-right: 6px; }
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.4; cursor: default; }
+    button.sec { background: #e2e8f0; color: #1e293b; }
+    button.mini { padding: 4px 10px; font-size: 12px; }
+    .barra { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .chip { display: inline-block; background: var(--tp-suave, #fbf3e8); color: var(--tp-principal, #7c2d12); border: 1px solid var(--tp-borde, #e0c49a); border-radius: 999px;
+            padding: 4px 12px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.06em; }
+    .peq { color: #475569; font-size: 13px; }
+    .desliza { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ddd; padding: 6px; font-size: 13px; text-align: left; vertical-align: top; }
+    th { background: var(--tp-principal, #7c2d12); color: white; }
+    #estado { font-size: 14px; }
+  </style>
+  <link rel="stylesheet" href="diseno.css">
+</head>
+<body>
+  <div class="caja">
+    <div class="barra">
+      <div>
+        <span class="chip">Secretaría</span>
+        <h1>Directorio de docentes</h1>
+        <p id="saludo">Cargando...</p>
+      </div>
+      <div>
+        <button class="sec" onclick="location.href='secretaria.html'">← Volver al panel</button>
+        <button onclick="App.salir()">Cerrar sesión</button>
+      </div>
+    </div>
+    <input type="search" id="filtro" aria-label="Buscar docente" placeholder="Buscar docente..." style="min-width:240px">
+    <button id="btnTodos">Descargar lista completa (PDF)</button>
+    <span id="estado"></span>
+    <p class="peq">El horario de cada docente se arma con lo que el administrador publicó por curso: se buscan las materias que
+      el docente imparte dentro de cada horario. Si un horario no escribe bien el nombre de la materia, esa celda no aparece.</p>
+  </div>
+  <div class="caja">
+    <div class="desliza"><table>
+      <thead><tr><th>Docente</th><th>Cédula</th><th>Nacimiento</th><th>Teléfono</th><th>Cursos y materias</th><th></th></tr></thead>
+      <tbody id="filas"><tr><td colspan="6">Cargando...</td></tr></tbody></table></div>
+  </div>
+
+    <script src="diseno.js"></script>
+  <script>Diseno.montar({grupo:"secretaria", pagina:"directorio_docentes.html"});</script>
+<script>
+    const cliente = App.cliente, esc = App.esc, $ = id => document.getElementById(id);
+    const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const msg = (t, c) => App.estado('estado', t, c);
+    const norm = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    const fecha = f => f ? f.split('-').reverse().join('/') : '—';
+    let docentes = [], horarios = {}, nombreMia = '';
+
+    async function iniciar() {
+      const ctx = await App.exigirRol(['secretaria', 'admin']);
+      if (!ctx) return;
+      nombreMia = ctx.perfil.nombre + ' ' + ctx.perfil.apellido;
+      $('saludo').textContent = nombreMia;
+      if (window.RolActivo) {
+        const visual = RolActivo.preparar(ctx, 'directorio_docentes.html');
+        if (!visual) return;   // v3: página de otro rol activo -> ya redirigió
+        RolActivo.aplicarDiseno(visual, ctx.uid);
+      }
+      $('filtro').addEventListener('input', dibujar);
+      $('btnTodos').addEventListener('click', pdfLista);
+      $('filas').addEventListener('click', e => {
+        const b = e.target.closest('[data-pdf]');
+        if (b) pdfDocente(docentes.find(d => d.id === b.dataset.pdf));
+      });
+      await cargar();
+    }
+
+    async function cargar() {
+      try {
+        const ex = await cliente.from('roles_adicionales').select('perfil_id').eq('rol', 'profesor');
+        const ids = (ex.data || []).map(x => x.perfil_id);
+        let q = cliente.from('perfiles').select('id, nombre, apellido').order('apellido').order('nombre');
+        q = ids.length ? q.or('rol.eq.profesor,id.in.(' + ids.join(',') + ')') : q.eq('rol', 'profesor');
+        const [p, asig, h] = await Promise.all([q,
+          cliente.from('asignaturas').select('id, nombre, curso_id, profesor_id, cursos(grado, seccion)').not('profesor_id', 'is', null),
+          cliente.from('horarios').select('curso_id, bloques')]);
+        if (p.error || asig.error || h.error) throw (p.error || asig.error || h.error);
+        const datos = await cliente.from('datos_personales').select('perfil_id, cedula, fecha_nacimiento, telefono')
+          .in('perfil_id', (p.data || []).map(x => x.id));
+        const dp = {};
+        (datos.data || []).forEach(x => dp[x.perfil_id] = x);
+        horarios = {};
+        (h.data || []).forEach(x => horarios[x.curso_id] = x.bloques || []);
+        docentes = (p.data || []).map(x => ({
+          id: x.id, nombre: x.nombre, apellido: x.apellido, dp: dp[x.id] || {},
+          materias: (asig.data || []).filter(a => a.profesor_id === x.id).map(a => ({
+            nombre: a.nombre, curso_id: a.curso_id, curso: a.cursos ? a.cursos.grado + ' ' + a.cursos.seccion : '?' }))
+        }));
+        dibujar();
+      } catch (e) {
+        $('filas').innerHTML = '<tr><td colspan="6">Error: ' + esc(e.message) + '</td></tr>';
+      }
+    }
+
+    function resumen(d) {
+      const por = {};
+      d.materias.forEach(m => { (por[m.curso] = por[m.curso] || []).push(m.nombre); });
+      return Object.keys(por).map(c => c + ': ' + por[c].join(', '));
+    }
+
+    function dibujar() {
+      const q = norm($('filtro').value);
+      const lista = docentes.filter(d => !q || norm(d.nombre + ' ' + d.apellido).includes(q));
+      $('filas').innerHTML = lista.length ? lista.map(d => '<tr><td>' + esc(d.apellido + ', ' + d.nombre) + '</td><td>' +
+        esc(d.dp.cedula || '—') + '</td><td>' + fecha(d.dp.fecha_nacimiento) + '</td><td>' + esc(d.dp.telefono || '—') + '</td><td>' +
+        (resumen(d).map(esc).join('<br>') || '<span class="peq">Sin materias asignadas</span>') + '</td><td>' +
+        '<button class="mini" data-pdf="' + d.id + '">PDF con horario</button></td></tr>').join('')
+        : '<tr><td colspan="6">Sin resultados</td></tr>';
+    }
+
+    // Celdas del horario que corresponden a este docente (por materia y curso)
+    function horarioDe(d) {
+      const filas = [];
+      const cursos = [...new Set(d.materias.map(m => m.curso_id))];
+      cursos.forEach(cid => {
+        const mats = d.materias.filter(m => m.curso_id === cid);
+        (horarios[cid] || []).forEach(b => {
+          if (b.etiqueta) return;
+          const celdas = DIAS.map((_, i) => {
+            const t = b.celdas && b.celdas[i];
+            const hit = t && mats.find(m => norm(t).includes(norm(m.nombre)));
+            return hit ? hit.nombre + ' (' + hit.curso + ')' : '';
+          });
+          if (celdas.some(Boolean)) filas.push([b.inicio + ' - ' + b.fin].concat(celdas));
+        });
+      });
+      return filas.sort((a, b) => a[0].localeCompare(b[0]));
+    }
+
+    function cabecera(doc, titulo) {
+      doc.setFontSize(14); doc.text((window.LICEO && window.LICEO.nombre) || 'Liceo', 14, 16);
+      doc.setFontSize(11); doc.text(titulo, 14, 23);
+      doc.setFontSize(9); doc.text('Generado el ' + new Date().toLocaleDateString('es-DO') + ' por ' + nombreMia, 14, 29);
+    }
+
+    function pdfLista() {
+      const doc = new window.jspdf.jsPDF({ orientation: 'landscape' });
+      cabecera(doc, 'Lista de docentes');
+      doc.autoTable({ startY: 34, styles: { fontSize: 8 }, headStyles: { fillColor: [30, 58, 138] },
+        head: [['Docente', 'Cédula', 'Nacimiento', 'Teléfono', 'Cursos y materias']],
+        body: docentes.map(d => [d.apellido + ', ' + d.nombre, d.dp.cedula || '', fecha(d.dp.fecha_nacimiento).replace('—', ''),
+          d.dp.telefono || '', resumen(d).join('\n')]) });
+      doc.save('docentes.pdf');
+    }
+
+    function pdfDocente(d) {
+      const doc = new window.jspdf.jsPDF({ orientation: 'landscape' });
+      cabecera(doc, 'Docente: ' + d.apellido + ', ' + d.nombre);
+      doc.autoTable({ startY: 34, theme: 'plain', styles: { fontSize: 10 },
+        body: [['Cédula', d.dp.cedula || '—'], ['Nacimiento', fecha(d.dp.fecha_nacimiento)], ['Teléfono', d.dp.telefono || '—'],
+          ['Cursos y materias', resumen(d).join('\n') || 'Sin materias asignadas']] });
+      const filas = horarioDe(d);
+      doc.autoTable({ startY: doc.lastAutoTable.finalY + 6, styles: { fontSize: 8 }, headStyles: { fillColor: [30, 58, 138] },
+        head: [['Hora'].concat(DIAS)], body: filas.length ? filas : [['Sin horario publicado para sus materias', '', '', '', '', '', '']] });
+      doc.save('docente_' + d.apellido.replace(/\s+/g, '_') + '.pdf');
+    }
+
+    iniciar();
+  </script>
+  <script src="tema.js"></script>
+</body>
+</html>
