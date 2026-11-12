@@ -329,6 +329,7 @@
       lista.appendChild(li);
     });
     nav.appendChild(lista);
+    pintarBarraMovil();   /* v4.1.2 */
     if (enfocado) {
       var otra = nav.querySelector('[data-clave="' + enfocado.replace(/"/g, '\\"') + '"]');
       if (otra) otra.focus();
@@ -739,6 +740,7 @@
     layout.appendChild(header);
     layout.appendChild(aside);
     layout.appendChild(main);
+    construirMovil(layout);   /* v4.1.2 */
     document.body.insertBefore(layout, document.body.firstChild);
     document.body.classList.add("es-diseno");
     saltoAlContenido("diseno-contenido");
@@ -1248,6 +1250,245 @@
     pintar();
   }
 
+  /* ===================== v4.1.2: pantallas angostas (celular) =====================
+     Solo se ve con la pantalla de 760 px o menos (la misma medida que ya usaba el menú).
+     En computadora estos elementos existen pero están ocultos (display: none), así que
+     la vista de escritorio no cambia.
+     - Roles: un desplegable con el rol actual (mismo cambio de rol de siempre).
+     - Menú inferior tipo app: 4 opciones principales + «Más» (resto, Cerrar sesión y créditos).
+       Cada botón de abajo usa el MISMO enlace del menú lateral (que en el celular queda oculto),
+       así que hace exactamente lo mismo. */
+  var CORTO = {
+    "Cursos y alumnos": "Cursos", "Materias y profesores": "Materias", "Personal y roles": "Personal",
+    "Calificaciones": "Notas", "Aula (tareas)": "Aula", "Asistencias": "Asistencia",
+    "Solicitudes y documentos": "Solicitudes", "Resumen de mi hijo(a)": "Resumen",
+    "Materias y tareas": "Materias", "Calendario de entregas": "Calendario",
+    "Calificaciones y asistencia": "Notas", "Reporte de alumno": "Reporte",
+    "Directorio de docentes": "Directorio", "Permisos de alumnos": "Permisos"
+  };
+  var PRINCIPALES = 4;
+
+  function ajustarViewportMovil() {
+    /* En el celular la barra de abajo respeta la zona del iPhone (barra de inicio):
+       viewport-fit=cover hace que env(safe-area-inset-*) tenga valor. Solo en pantallas angostas. */
+    var m = document.querySelector('meta[name="viewport"]');
+    if (!m) return;
+    var c = m.getAttribute("content") || "";
+    var sin = c.replace(/,\s*viewport-fit=cover/g, "");
+    var nuevo = mq.matches ? sin + ", viewport-fit=cover" : sin;
+    if (nuevo !== c) m.setAttribute("content", nuevo);
+  }
+
+  function itemsMovil() {
+    var nav = document.getElementById("diseno-nav");
+    var todos = nav ? Array.prototype.slice.call(nav.querySelectorAll("li > a, li > button.diseno-enlace")) : [];
+    var salir = todos.filter(function (el) { return el.classList.contains("diseno-salir"); });
+    var resto = todos.filter(function (el) { return !el.classList.contains("diseno-salir"); });
+    var datos = resto.filter(function (el) { return el.getAttribute("href") === "mis_datos.html"; });
+    var principales = resto.filter(function (el) { return datos.indexOf(el) === -1; }).slice(0, PRINCIPALES);
+    var mas = resto.filter(function (el) { return principales.indexOf(el) === -1; });
+    return { principales: principales, mas: mas, salir: salir };
+  }
+
+  /* Copia un enlace del menú lateral; al tocarla se pulsa el original (misma lógica). */
+  function copiaDeEnlace(orig, corto, alTocar) {
+    var el = orig.cloneNode(true);
+    el.removeAttribute("id");
+    el.className = "diseno-movil-item sin-tema" + (orig.classList.contains("diseno-alerta") ? " diseno-alerta" : "") +
+      (orig.classList.contains("diseno-salir") ? " diseno-salir" : "");
+    var tip = el.querySelector(".diseno-tooltip");
+    if (tip) tip.parentNode.removeChild(tip);
+    /* El número del globito se dibuja con CSS (::after) para que el nombre
+       accesible siga empezando por el texto visible (WCAG 2.5.3) */
+    Array.prototype.forEach.call(el.querySelectorAll(".diseno-contador"), function (c) {
+      c.setAttribute("data-n", c.textContent.trim());
+      c.textContent = "";
+    });
+    if (corto) {
+      var et = el.querySelector(".diseno-etiqueta");
+      var lbl = orig.querySelector(".diseno-etiqueta");
+      var texto = lbl ? (lbl.firstChild && lbl.firstChild.nodeType === 3 ? lbl.firstChild.nodeValue : lbl.textContent).trim() : "";
+      var corta = CORTO[texto] || texto;
+      if (et) et.textContent = corta;
+      /* El nombre que leen los lectores empieza por lo que se ve (WCAG 2.5.3) */
+      var nombreOrig = orig.getAttribute("aria-label") || texto;
+      var resto = nombreOrig.indexOf(texto) === 0 ? nombreOrig.slice(texto.length) : "";
+      el.setAttribute("aria-label", corta + (corta !== texto ? " (" + texto + ")" : "") + resto);
+    }
+    el.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      if (alTocar) alTocar();
+      orig.click();
+    });
+    return el;
+  }
+
+  function pintarBarraMovil() {
+    var barra = document.getElementById("diseno-barra-movil");
+    if (!barra) return;
+    var g = itemsMovil();
+    var ul = document.createElement("ul");
+    ul.className = "diseno-movil-lista";
+    g.principales.forEach(function (orig) {
+      var li = document.createElement("li");
+      li.appendChild(copiaDeEnlace(orig, true));
+      ul.appendChild(li);
+    });
+    var activoEnMas = g.mas.some(function (el) { return el.getAttribute("aria-current") === "page"; });
+    var alertaEnMas = g.mas.some(function (el) { return el.classList.contains("diseno-alerta"); });
+    var li = document.createElement("li");
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.id = "diseno-btn-mas";
+    btn.className = "diseno-movil-item diseno-btn-mas sin-tema" + (activoEnMas ? " es-activo" : "") + (alertaEnMas ? " diseno-alerta" : "");
+    btn.setAttribute("aria-controls", "diseno-mas");
+    var abierto = !!(document.getElementById("diseno-mas") && !document.getElementById("diseno-mas").hidden);
+    btn.setAttribute("aria-expanded", String(abierto));
+    var actual = g.mas.filter(function (el) { return el.getAttribute("aria-current") === "page"; })[0];
+    btn.setAttribute("aria-label", "Más opciones" + (actual ? " (estás en " + (actual.querySelector(".diseno-etiqueta") || actual).textContent.trim() + ")" : "") + (alertaEnMas ? ", hay novedades" : ""));
+    btn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 7h14M5 12h14M5 17h14"/></svg><span class="diseno-etiqueta">Más</span>' +
+      (alertaEnMas ? '<span class="diseno-movil-punto" aria-hidden="true"></span>' : "");
+    btn.addEventListener("click", function () { alternarMas(); });
+    li.appendChild(btn);
+    ul.appendChild(li);
+    barra.textContent = "";
+    barra.appendChild(ul);
+    barra.hidden = !(g.principales.length || g.mas.length || g.salir.length);
+    if (abierto) llenarMas();
+  }
+
+  function llenarMas() {
+    var hoja = document.getElementById("diseno-mas");
+    if (!hoja) return;
+    var cuerpo = hoja.querySelector(".diseno-mas-cuerpo");
+    var g = itemsMovil();
+    var enfocado = document.activeElement && cuerpo.contains(document.activeElement) ? document.activeElement.getAttribute("data-clave") : null;
+    cuerpo.textContent = "";
+    var ul = document.createElement("ul");
+    ul.className = "diseno-mas-lista";
+    g.mas.concat(g.salir).forEach(function (orig) {
+      var li = document.createElement("li");
+      li.appendChild(copiaDeEnlace(orig, false, function () { cerrarMas(false); }));
+      ul.appendChild(li);
+    });
+    cuerpo.appendChild(ul);
+    var firma = document.getElementById("firma-creador");
+    if (firma) {
+      var f = firma.cloneNode(true);
+      f.removeAttribute("id");
+      f.className = "firma-creador diseno-mas-firma";
+      cuerpo.appendChild(f);
+    }
+    if (enfocado) {
+      var otra = cuerpo.querySelector('[data-clave="' + enfocado.replace(/"/g, '\\"') + '"]');
+      if (otra) otra.focus();
+    }
+  }
+
+  var focoAntesDeMas = null;
+  function abrirMas() {
+    var hoja = document.getElementById("diseno-mas");
+    if (!hoja) return;
+    llenarMas();
+    focoAntesDeMas = document.getElementById("diseno-btn-mas");
+    hoja.hidden = false;
+    document.getElementById("diseno-mas-fondo").hidden = false;
+    var b = document.getElementById("diseno-btn-mas");
+    if (b) b.setAttribute("aria-expanded", "true");
+    var primero = hoja.querySelector(".diseno-mas-cuerpo a, .diseno-mas-cuerpo button");
+    try { (primero || hoja).focus(); } catch (e) {}
+  }
+  function cerrarMas(devolverFoco) {
+    var hoja = document.getElementById("diseno-mas");
+    if (!hoja || hoja.hidden) return;
+    hoja.hidden = true;
+    document.getElementById("diseno-mas-fondo").hidden = true;
+    var b = document.getElementById("diseno-btn-mas");
+    if (b) b.setAttribute("aria-expanded", "false");
+    if (devolverFoco && b) b.focus();
+  }
+  function alternarMas() {
+    var hoja = document.getElementById("diseno-mas");
+    if (hoja && hoja.hidden) abrirMas(); else cerrarMas(true);
+  }
+
+  function construirMovil(layout) {
+    if (document.getElementById("diseno-barra-movil")) return;
+    var barra = document.createElement("nav");
+    barra.id = "diseno-barra-movil";
+    barra.className = "diseno-barra-movil";
+    barra.setAttribute("aria-label", "Menú principal");
+    barra.hidden = true;
+    var fondo = document.createElement("div");
+    fondo.id = "diseno-mas-fondo";
+    fondo.className = "diseno-mas-fondo";
+    fondo.hidden = true;
+    fondo.addEventListener("click", function () { cerrarMas(true); });
+    var hoja = document.createElement("div");
+    hoja.id = "diseno-mas";
+    hoja.className = "diseno-mas";
+    hoja.setAttribute("role", "dialog");
+    hoja.setAttribute("aria-modal", "true");
+    hoja.setAttribute("aria-labelledby", "diseno-mas-titulo");
+    hoja.tabIndex = -1;
+    hoja.hidden = true;
+    hoja.innerHTML = '<div class="diseno-mas-cab"><h2 id="diseno-mas-titulo">Más opciones</h2>' +
+      '<button type="button" class="diseno-mas-cerrar sin-tema" aria-label="Cerrar «Más opciones»">' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>' +
+      '<div class="diseno-mas-cuerpo"></div>';
+    hoja.querySelector(".diseno-mas-cerrar").addEventListener("click", function () { cerrarMas(true); });
+    hoja.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { e.preventDefault(); cerrarMas(true); return; }
+      if (e.key !== "Tab") return;
+      var f = Array.prototype.slice.call(hoja.querySelectorAll("a[href], button:not([disabled])"));
+      if (!f.length) return;
+      if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+      else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+    });
+    layout.appendChild(fondo);
+    layout.appendChild(hoja);
+    layout.appendChild(barra);
+    ajustarViewportMovil();
+    var alCambiar = function () { ajustarViewportMovil(); if (!mq.matches) cerrarMas(false); };
+    if (mq.addEventListener) mq.addEventListener("change", alCambiar);
+    else if (mq.addListener) mq.addListener(alCambiar);
+  }
+
+  function pintarRolesMovil(lista, activo, nombres) {
+    var ident = document.querySelector(".diseno-identidad");
+    if (!ident) return;
+    var caja = document.getElementById("diseno-rol-movil");
+    if (!lista || lista.length < 2) {
+      if (caja) caja.parentNode.removeChild(caja);
+      ident.classList.remove("con-rol-movil");
+      return;
+    }
+    if (!caja) {
+      caja = document.createElement("div");
+      caja.id = "diseno-rol-movil";
+      caja.className = "diseno-rol-movil";
+      caja.innerHTML = '<label for="diseno-rol-select" class="diseno-solo-lector">Rol activo. Elige otro para cambiar de rol</label>' +
+        '<select id="diseno-rol-select" class="diseno-rol-select"></select>';
+      ident.appendChild(caja);
+    }
+    var sel = caja.querySelector("select");
+    sel.textContent = "";
+    lista.forEach(function (r) {
+      var o = document.createElement("option");
+      o.value = r;
+      o.textContent = nombres[r] || r;
+      if (r === activo) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.onchange = function () {
+      var r = sel.value;
+      if (r === activo) return;
+      if (window.RolActivo) RolActivo.irAlInicio(r, lista);
+      else if (window.App && App.irAlInicioDeRol) App.irAlInicioDeRol(r, lista);
+    };
+    ident.classList.add("con-rol-movil");
+  }
+
   window.Diseno = {
     montar: montar,
     identificar: function (nombre, rol, clave, uid) {
@@ -1282,9 +1523,10 @@
           return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
         });
       caja.textContent = "";
+      var nombres = (window.RolActivo && RolActivo.nombres && RolActivo.nombres()) || (window.App && App.NOMBRES) || {};
+      pintarRolesMovil(lista, activo, nombres);   /* v4.1.2 */
       if (lista.length < 2) { caja.hidden = true; return; }
       caja.hidden = false;
-      var nombres = (window.RolActivo && RolActivo.nombres && RolActivo.nombres()) || (window.App && App.NOMBRES) || {};
       lista.forEach(function (r) {
         var b = document.createElement("button");
         b.type = "button";

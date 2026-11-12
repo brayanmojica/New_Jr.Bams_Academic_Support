@@ -1186,3 +1186,161 @@ html[data-tema="clasico"] {
 #diseno-nav button.diseno-enlace.diseno-salir { margin: 0; }
 :where(html:not([data-tema="clasico"])) #diseno-nav button.diseno-enlace.diseno-salir { color: #fecaca; }
 :where(html[data-tema="clasico"]) #diseno-nav button.diseno-enlace.diseno-salir { color: #b91c1c; }
+
+/* v4.1.1: «Descargar listado de alumnos» (CSV). Usa las variables de la v4.1,
+   así sigue al tema Académico o Clásico y a los colores elegidos por el admin. */
+.listado-descarga { margin: 10px 0 6px; }
+.cabecera-curso > .listado-descarga { margin: 0; padding: 0 20px 12px; }
+button.btn-listado.sin-tema {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin: 4px 0; padding: 8px 14px; min-height: 40px;
+  border: 1px solid var(--acento) !important; border-radius: 8px;
+  background: var(--acento-suave) !important; color: var(--acento) !important;
+  font: inherit; font-weight: 600; cursor: pointer;
+}
+button.btn-listado.sin-tema:hover { background: var(--acento) !important; color: #fff !important; }
+button.btn-listado.sin-tema:focus-visible { outline: 3px solid var(--acento); outline-offset: 2px; }
+button.btn-listado svg { flex: none; }
+.listado-descarga .ayuda-listado { margin: 4px 0 0; max-width: 72ch; font-size: 13px; color: var(--texto-suave, #44403c); }
+.estado-listado { margin: 6px 0 0; padding: 6px 10px; border-left: 4px solid var(--acento); border-radius: 6px;
+  background: var(--acento-suave); color: var(--texto, #1c1917); font-size: 14px; }
+.estado-listado:empty { margin: 0; padding: 0; border: 0; }
+.estado-listado[data-tipo="vacio"] { border-left-color: #b45309; }
+@media (max-width: 760px) {
+  button.btn-listado.sin-tema { width: 100%; justify-content: center; min-height: 44px; }
+}
+@media print { .listado-descarga { display: none !important; } }
+
+/* =====================================================================
+   v4.1.2 · Celular (pantallas de 760 px o menos). En computadora no cambia nada:
+   estas piezas existen pero quedan ocultas.
+   - Roles en un desplegable; cabecera compacta (sin créditos: van en «Más»).
+   - Menú inferior tipo app (4 opciones + «Más»); la barra lateral se oculta.
+   - Tarjetas de números de 2 en 2.
+   Usa las variables de la v4.1 (sigue al tema Académico o Clásico).
+   ===================================================================== */
+.diseno-barra-movil, .diseno-mas, .diseno-mas-fondo, .diseno-rol-movil { display: none !important; }
+.diseno-solo-lector {
+  position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+@media (max-width: 760px) {
+  /* Una sola columna: sin barra lateral ni botón de menú */
+  .diseno-layout, .diseno-layout.es-ampliada { grid-template-columns: minmax(0, 1fr) !important; grid-template-rows: auto 1fr !important; }
+  .diseno-layout #diseno-barra, .diseno-layout.es-ampliada #diseno-barra, .diseno-layout #diseno-btn-menu { display: none !important; }
+
+  /* Cabecera compacta */
+  .diseno-layout .diseno-header, .diseno-layout.es-ampliada .diseno-header {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    min-height: 56px;
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+  .diseno-layout .diseno-identidad { padding: 6px 4px 6px 12px; gap: 2px; justify-content: center; }
+  .diseno-layout .diseno-espacio { white-space: nowrap; font-size: .95rem; line-height: 1.25; }
+  .diseno-layout .diseno-rol { font-size: .78rem; }
+  .diseno-layout .diseno-roles { display: none !important; }
+  .diseno-identidad.con-rol-movil .diseno-rol { display: none; }
+  .diseno-identidad .diseno-rol-movil { display: block !important; position: relative; align-self: flex-start; max-width: 100%; }
+  .diseno-identidad .diseno-rol-movil::after {
+    content: "▾"; position: absolute; right: 13px; top: 50%; transform: translateY(-52%);
+    color: var(--acento); font-size: .9rem; pointer-events: none;
+  }
+  .diseno-identidad .diseno-rol-select {
+    -webkit-appearance: none; appearance: none;
+    min-height: 44px; max-width: 100%; margin: 0; padding: 0 32px 0 14px;
+    border: 1px solid var(--acento); border-radius: 999px;
+    background: var(--acento-suave); color: var(--acento);
+    font: inherit; font-size: .85rem; font-weight: 700; cursor: pointer;
+  }
+  .diseno-layout .diseno-acciones-cab { padding-right: max(10px, env(safe-area-inset-right, 0px)); }
+  .diseno-layout .diseno-acciones-cab .firma-creador { display: none !important; }
+
+  /* Espacio abajo para que el menú inferior no tape el contenido */
+  .diseno-layout .diseno-main { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important; }
+
+  /* Tarjetas de números: 2 por fila */
+  body.es-diseno .diseno-tarjetas { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px; }
+  body.es-diseno .diseno-tarjeta { padding: 10px 12px; min-width: 0; }
+  body.es-diseno .diseno-tarjeta .rotulo { font-size: .85rem; overflow-wrap: anywhere; }
+
+  /* Menú inferior */
+  .diseno-barra-movil:not([hidden]) {
+    display: block !important;
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 70;
+    padding: 4px max(4px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(4px, env(safe-area-inset-left, 0px));
+    background: var(--tarjeta, #fff);
+    border-top: 1px solid var(--linea, #dbe4f0);
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, .08);
+  }
+  .diseno-movil-lista { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; margin: 0; padding: 0; list-style: none; }
+  .diseno-movil-lista li { margin: 0; min-width: 0; }
+  .diseno-barra-movil .diseno-movil-item {
+    position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    width: 100%; min-height: 56px; margin: 0; padding: 6px 2px;
+    border: 0; border-radius: 12px; background: transparent !important; box-shadow: none;
+    color: var(--texto-suave, #334155) !important; font: inherit; font-size: .72rem; font-weight: 600; line-height: 1.15;
+    text-decoration: none; cursor: pointer;
+  }
+  .diseno-movil-item svg, .diseno-mas svg {
+    width: 24px; height: 24px; flex: none;
+    fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .diseno-barra-movil .diseno-etiqueta { display: block !important; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .diseno-barra-movil .diseno-movil-item[aria-current="page"], .diseno-barra-movil .diseno-movil-item.es-activo {
+    background: var(--acento-suave) !important; color: var(--acento) !important; font-weight: 700;
+  }
+  .diseno-barra-movil .diseno-movil-item[aria-current="page"]::before, .diseno-barra-movil .diseno-movil-item.es-activo::before {
+    content: ""; position: absolute; top: 0; left: 25%; right: 25%; height: 3px; border-radius: 0 0 3px 3px; background: var(--acento);
+  }
+  .diseno-barra-movil .diseno-alerta svg { color: #b91c1c; }
+  .diseno-barra-movil .diseno-contador {
+    position: absolute; top: 3px; left: calc(50% + 4px);
+    min-width: 18px; height: 18px; padding: 0 4px; border-radius: 999px;
+    background: #b91c1c; color: #fff; font-size: .68rem; font-weight: 700; line-height: 18px; text-align: center;
+  }
+  .diseno-movil-punto { position: absolute; top: 6px; left: calc(50% + 6px); width: 10px; height: 10px; border-radius: 50%; background: #b91c1c; }
+
+  /* «Más»: hoja que sube desde abajo */
+  .diseno-mas-fondo:not([hidden]) { display: block !important; position: fixed; inset: 0; z-index: 66; background: rgba(15, 23, 42, .45); }
+  .diseno-mas:not([hidden]) {
+    display: block !important;
+    position: fixed; left: 0; right: 0; bottom: calc(62px + env(safe-area-inset-bottom, 0px)); z-index: 68;
+    max-height: calc(100vh - 150px); overflow-y: auto;
+    padding: 6px max(12px, env(safe-area-inset-right, 0px)) 12px max(12px, env(safe-area-inset-left, 0px));
+    background: var(--tarjeta, #fff); color: var(--texto, #0f172a);
+    border-radius: 16px 16px 0 0; box-shadow: 0 -6px 24px rgba(0, 0, 0, .18);
+  }
+  .diseno-mas-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .diseno-mas-cab h2 { margin: 0; font-size: 1.05rem; }
+  .diseno-mas .diseno-mas-cerrar {
+    display: grid; place-items: center; width: 44px; height: 44px; margin: 0; padding: 0;
+    border: 0; border-radius: 999px; background: transparent !important; color: var(--texto, #0f172a); cursor: pointer;
+  }
+  .diseno-mas-lista { margin: 4px 0 0; padding: 0; list-style: none; }
+  .diseno-mas-lista li { margin: 0; border-top: 1px solid var(--linea, #dbe4f0); }
+  .diseno-mas-lista li:first-child { border-top: 0; }
+  .diseno-mas .diseno-etiqueta { display: inline !important; }
+  .diseno-mas .diseno-movil-item {
+    position: relative; display: flex; align-items: center; gap: 12px;
+    width: 100%; min-height: 52px; margin: 0; padding: 0 10px;
+    border: 0; border-radius: 10px; background: transparent !important;
+    color: var(--texto, #0f172a) !important; font: inherit; font-size: 1rem; font-weight: 500; text-align: left; text-decoration: none; cursor: pointer;
+  }
+  .diseno-mas .diseno-movil-item[aria-current="page"] { background: var(--acento-suave) !important; color: var(--acento) !important; font-weight: 700; }
+  .diseno-mas .diseno-movil-item.diseno-salir { color: #b91c1c !important; }
+  .diseno-mas .diseno-movil-item.diseno-alerta svg { color: #b91c1c; }
+  .diseno-mas .diseno-contador {
+    position: static; margin-left: auto; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px;
+    background: #b91c1c; color: #fff; font-size: .75rem; font-weight: 700; line-height: 22px; text-align: center;
+  }
+  .diseno-mas .diseno-mas-firma { display: block; margin: 12px 4px 2px; text-align: center; white-space: normal; max-width: none; }
+}
+@media (max-width: 760px) and (prefers-reduced-motion: no-preference) {
+  .diseno-mas:not([hidden]) { animation: diseno-mas-sube .18s ease-out; }
+}
+@keyframes diseno-mas-sube { from { transform: translateY(16px); opacity: .6; } to { transform: none; opacity: 1; } }
+@media print { .diseno-barra-movil, .diseno-mas, .diseno-mas-fondo { display: none !important; } }
+
+/* v4.1.2 · número del globito en la barra y en «Más» (se dibuja con CSS) */
+.diseno-movil-item .diseno-contador::after { content: attr(data-n); }
